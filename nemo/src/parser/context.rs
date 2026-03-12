@@ -172,6 +172,9 @@ pub enum ParserContext {
     /// A letter or a digit
     #[assoc(name = "letter or digit")]
     AlphaNum,
+    /// Rule Annotation
+    #[assoc(name = "rule annotation")]
+    RuleAnnotation,
 }
 
 impl ParserContext {

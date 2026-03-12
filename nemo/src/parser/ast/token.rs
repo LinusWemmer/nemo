@@ -31,7 +31,7 @@ use crate::{
         datavalues::{self, RDF_DATATYPE_INDICATOR, boolean, iri, map, string, tuple},
         directive, encoding_prefixes,
         expression::{aggregate, atom, format_string, operation, variable},
-        operator, rule, annotation
+        operator, rule, rule_annotation
     },
 };
 
@@ -297,16 +297,16 @@ pub enum TokenKind {
     #[assoc(name = rule::CLOSE_ATTRIBUTE)]
     CloseAttribute,
     /// Opening token annotation
-    #[assoc(name = annotation::OPEN_ANNOTATION)]
-    OpenAnnotation,
+    #[assoc(name = rule_annotation::OPEN_RULE_ANNOTATION)]
+    OpenRuleAnnotation,
     /// Closing token for annotation
-    #[assoc(name = annotation::CLOSE_ANNOTATION)]
-    CloseAnnotation,
+    #[assoc(name = rule_annotation::CLOSE_RULE_ANNOTATION)]
+    CloseRuleAnnotation,
     /// Requires annotation
-    #[assoc(name = annotation::REQUIRES_ANNOTATION)]
+    #[assoc(name = rule_annotation::REQUIRES_ANNOTATION)]
     RequiresAnnotation,
     /// Ensures annotation
-    #[assoc(name = annotation::ENSURE_ANNOTATION)]
+    #[assoc(name = rule_annotation::ENSURE_ANNOTATION)]
     EnsureAnnotation,
     /// Space (space, tab)
     #[assoc(name = "space")]
@@ -871,8 +871,8 @@ impl<'a> Token<'a> {
     string_token!(close_attribute, TokenKind::CloseAttribute);
     string_token!(requires_annotation, TokenKind::RequiresAnnotation);
     string_token!(ensures_annotation, TokenKind::EnsureAnnotation);
-    string_token!(open_annotation, TokenKind::OpenAnnotation);
-    string_token!(close_annotation, TokenKind::CloseAnnotation);
+    string_token!(open_rule_annotation, TokenKind::OpenRuleAnnotation);
+    string_token!(close_rule_annotation, TokenKind::CloseRuleAnnotation);
     string_token!(rule_arrow, TokenKind::RuleArrow);
     string_token!(universal_indicator, TokenKind::UniversalIndicator);
     string_token!(existential_indicator, TokenKind::ExistentialIndicator);
