@@ -1,6 +1,7 @@
 //! This module defines the abstract syntax tree representation of a nemo program.
 
 pub mod attribute;
+pub mod annotation;
 pub mod comment;
 pub mod directive;
 pub mod expression;

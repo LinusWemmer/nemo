@@ -83,7 +83,22 @@ pub mod rule {
     pub const OPEN_ATTRIBUTE: &str = "#[";
     /// The closing token for attributes.
     pub const CLOSE_ATTRIBUTE: &str = "]";
+    
 }
+
+pub mod annotation {
+    //! This module contains syntax definitions for annotations.
+
+    /// The opening token for annotations.
+    pub const OPEN_ANNOTATION : &str = "[";
+    /// The closing token for annotation.
+    pub const CLOSE_ANNOTATION: &str = "]";
+    /// test implementation in parser for annotation
+    pub const REQUIRES_ANNOTATION: &str = "requires:";
+    /// Ensure annotation
+    pub const ENSURE_ANNOTATION: &str = "ensure:";
+}
+
 pub mod fact {
     //! This module contains the syntax definitions for facts.
 }
