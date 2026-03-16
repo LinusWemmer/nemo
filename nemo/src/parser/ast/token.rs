@@ -31,7 +31,7 @@ use crate::{
         datavalues::{self, RDF_DATATYPE_INDICATOR, boolean, iri, map, string, tuple},
         directive, encoding_prefixes,
         expression::{aggregate, atom, format_string, operation, variable},
-        operator, rule, rule_annotation
+        operator, rule, rule_annotation, annotation_global
     },
 };
 
@@ -308,6 +308,15 @@ pub enum TokenKind {
     /// Ensures annotation
     #[assoc(name = rule_annotation::ENSURE_ANNOTATION)]
     EnsureAnnotation,
+    /// Open assert annotation
+    #[assoc(name= annotation_global::OPEN_ASSERT)]
+    OpenAssert,
+    /// Open verify annotation
+    #[assoc(name= annotation_global::OPEN_VERIFY)]
+    OpenVerify,
+    /// Annotation Seperator
+    #[assoc(name= annotation_global::ANNOTATION_SEPERATOR)]
+    AnnotationSeperator,
     /// Space (space, tab)
     #[assoc(name = "space")]
     Space,
@@ -873,6 +882,9 @@ impl<'a> Token<'a> {
     string_token!(ensures_annotation, TokenKind::EnsureAnnotation);
     string_token!(open_rule_annotation, TokenKind::OpenRuleAnnotation);
     string_token!(close_rule_annotation, TokenKind::CloseRuleAnnotation);
+    string_token!(open_assert, TokenKind::OpenAssert);
+    string_token!(open_verify, TokenKind::OpenVerify);
+    string_token!(annotation_seperator, TokenKind::AnnotationSeperator);
     string_token!(rule_arrow, TokenKind::RuleArrow);
     string_token!(universal_indicator, TokenKind::UniversalIndicator);
     string_token!(existential_indicator, TokenKind::ExistentialIndicator);

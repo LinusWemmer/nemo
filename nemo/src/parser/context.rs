@@ -175,6 +175,9 @@ pub enum ParserContext {
     /// Rule Annotation
     #[assoc(name = "rule annotation")]
     RuleAnnotation,
+    /// Global Annotation
+    #[assoc(name = "global annotation")]
+    GlobalAnnotation,
 }
 
 impl ParserContext {

@@ -99,6 +99,18 @@ pub mod rule_annotation {
     pub const ENSURE_ANNOTATION: &str = "ensure:";
 }
 
+pub mod annotation_global {
+    //! This module contains syntax definitions for global annotations.
+    
+    /// opening token assert:
+    pub const OPEN_ASSERT : &str = "#assert";
+    /// opening token verify:
+    pub const OPEN_VERIFY : &str = "#verify";
+    /// seperator atom and restriction
+    pub const ANNOTATION_SEPERATOR : &str = ":";
+
+}
+
 pub mod fact {
     //! This module contains the syntax definitions for facts.
 }
