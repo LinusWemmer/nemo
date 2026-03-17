@@ -8,7 +8,7 @@ use nom::{
 };
 
 use crate::parser::{
-    ParserResult,
+    ParserResult, 
     context::{ParserContext, context},
     input::ParserInput,
     span::Span,
@@ -22,6 +22,7 @@ use super::{
     guard::Guard,
     rule::Rule,
     token::Token,
+    global_annotation::GlobalAnnotation,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -36,6 +37,8 @@ pub enum StatementKind<'a> {
     Directive(Directive<'a>),
     /// This represents a statement, that has an error that could not get recovered in a child node.
     Error(Token<'a>),
+    /// Global Annotation
+    GlobalAnnotation(GlobalAnnotation<'a>),
 }
 
 impl<'a> StatementKind<'a> {
@@ -45,7 +48,9 @@ impl<'a> StatementKind<'a> {
             StatementKind::Fact(statement) => statement.context(),
             StatementKind::Rule(statement) => statement.context(),
             StatementKind::Directive(statement) => statement.context(),
+            StatementKind::GlobalAnnotation(statement) => statement.context(),
             StatementKind::Error(_statement) => ParserContext::Error,
+            
         }
     }
 
@@ -57,6 +62,7 @@ impl<'a> StatementKind<'a> {
                 map(Directive::parse, Self::Directive),
                 map(Rule::parse, Self::Rule),
                 map(Guard::parse, Self::Fact),
+                map(GlobalAnnotation::parse, Self::GlobalAnnotation),
             )),
         )(input)
     }
@@ -102,6 +108,7 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
             StatementKind::Fact(statement) => vec![statement],
             StatementKind::Rule(statement) => vec![statement],
             StatementKind::Directive(statement) => vec![statement],
+            StatementKind::GlobalAnnotation(statement) => vec![statement],
             StatementKind::Error(_) => vec![],
         }
     }
@@ -188,6 +195,10 @@ mod test {
             (
                 "@export test :- csv{resource = \"\"}.",
                 ParserContext::Directive,
+            ),
+             ( 
+                "#assert test(?X,?Y): ?X<3.",
+                ParserContext::GlobalAnnotation
             ),
         ];
 

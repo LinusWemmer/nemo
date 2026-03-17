@@ -18,7 +18,7 @@ use crate::{
     error::report::ProgramReport,
     parser::{
         ParserErrorReport, ParserState,
-        ast::{self, ProgramAST},
+        ast::{self, ProgramAST, global_annotation},
         error::translate_error_tree,
         input::ParserInput,
     },
@@ -101,6 +101,7 @@ impl ASTProgramTranslation {
                 ast::statement::StatementKind::Directive(directive) => {
                     handle_use_directive(&mut self, directive, program);
                 }
+                ast::statement::StatementKind::GlobalAnnotation(global_annotation) => todo!(),
                 ast::statement::StatementKind::Error(_token) => {
                     panic!(
                         "Faulty statement should result in a parser error and not be propagated."

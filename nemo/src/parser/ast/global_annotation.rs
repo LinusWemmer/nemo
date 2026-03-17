@@ -45,6 +45,11 @@ impl<'a> GlobalAnnotation<'a> {
         &self.kind
     }
 
+    /// Return the [Atom] that is annotated
+    pub fn predicate(&self) -> &Atom<'a>{
+        &self.predicate
+    }
+
     /// Parse an [AnnotationKind]
     pub fn parse_annotation_kind(input: ParserInput<'a>) -> ParserResult<'a, GlobalAnnotationKind> {
         alt((
@@ -83,27 +88,15 @@ impl<'a> ProgramAST<'a> for GlobalAnnotation<'a> {
         Self: Sized + 'a,
     {
         let input_span = input.span;
-        // TODO: make annotation into seperated pair (by ":")
         context(
             CONTEXT,
-            terminated(
-                delimited( 
-                    WSoC::parse,
-                    separated_pair(
-                      Self::parse_annotation_kind,
-                      WSoC::parse,
-                      separated_pair(
-                        Atom::parse,
-                        tuple((WSoC::parse, Token::annotation_seperator, WSoC::parse)), 
-                        Sequence::<InfixExpression>::parse
-                      )
-                    ),
-                    pair(WSoC::parse, Token::dot),
+                separated_pair(
+                    tuple((Self::parse_annotation_kind, WSoC::parse, Atom::parse)),
+                    tuple((WSoC::parse, Token::annotation_seperator, WSoC::parse)),
+                    Sequence::<InfixExpression>::parse,
                 ),
-                WSoC::parse,
-            ),
         )(input)
-        .map(|(rest, (kind, (predicate, restriction)) )| {
+        .map(|(rest, ((kind, _, predicate), restriction) )| {
             let rest_span = rest.span;
 
             (
@@ -136,8 +129,8 @@ mod test {
     #[test]
     fn parse_annotation() {
         let test = vec![
-            ("#assert test(?X,?Y): ?X<3.\n", ("test".to_string(), GlobalAnnotationKind::Assert)),
-            ("#verify bla(?X):  0<?X, ?X<10.\n", ("bla".to_string(), GlobalAnnotationKind::Verify)),
+            ("#assert test(?X,?Y): ?X<3", ("test".to_string(), GlobalAnnotationKind::Assert)),
+            ("#verify bla(?X):  0<?X, ?X<10", ("bla".to_string(), GlobalAnnotationKind::Verify)),
         ];
 
         for (input, expected) in test {
