@@ -242,6 +242,15 @@ pub enum ValidationError {
     #[assoc(code = 243)]
     ParameterRedefinition,
 
+    ///WIP: restricted variable in global annotation contains variables not in head
+    #[error("The variables in the global annotation should match the predicate")]
+    #[assoc(code = 600)]
+    ConflictingAnnotationVariables,
+    ///WIP: restrictions in global annotation are not (in)equalities
+    #[error("The operations in the annotation should be equalities/inequalities")]
+    #[assoc(code = 601)]
+    UnsoppertedAnnotationRestrictions,
+
     /// Unsupported feature: Multiple aggregates in one rule
     #[error(r#"multiple aggregates in one rule is currently unsupported"#)]
     #[assoc(code = 999)]

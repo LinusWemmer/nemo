@@ -139,6 +139,7 @@ mod test {
             %%% A rule\n\
             b(?y, ?x) :- a(?x, ?y) .\n\
             \n\
+            #assert test(?X,?Y): ?X<3. \n\
             % Some more comments
         ";
 
@@ -149,7 +150,7 @@ mod test {
 
         let result = result.unwrap();
         assert!(result.1.comment().is_some());
-        assert_eq!(result.1.statements.len(), 4);
+        assert_eq!(result.1.statements.len(), 5);
     }
 
     #[test]

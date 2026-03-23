@@ -1,7 +1,7 @@
 //! This module defines [GlobalAnnotation].
 
 use enum_assoc::Assoc;
-use nom::{branch::alt, sequence::{delimited, pair, separated_pair, terminated, tuple}};
+use nom::{branch::alt, sequence::{separated_pair, tuple}};
 
 use crate::parser::{
     ParserResult, ast::{expression::complex::{infix::InfixExpression, atom::Atom}, sequence::Sequence, token::TokenKind}, context::{ParserContext, context}, input::ParserInput, span::Span
