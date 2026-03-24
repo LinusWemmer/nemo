@@ -15,6 +15,7 @@ pub mod symbols;
 pub mod tag;
 pub mod term;
 pub mod global_annotation;
+pub mod rule_annotation;
 use std::{
     any::Any,
     fmt::{Debug, Display},
@@ -120,6 +121,9 @@ pub enum ProgramComponentKind {
     ///Global Annotation
     #[assoc(name= "global annotation")]
     GlobalAnnotation,
+    ///Rule Annotation
+    #[assoc(name= "rule annotation")]
+    RuleAnnotation,
     /// Import
     #[assoc(name = "import")]
     Import,

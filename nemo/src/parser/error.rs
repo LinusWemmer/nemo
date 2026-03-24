@@ -107,6 +107,7 @@ pub(crate) fn recover<'a>(
                     comment: None,
                     kind: StatementKind::Error(token),
                     attributes: Default::default(),
+                    annotations: Default::default(),
                 },
             ))
         }

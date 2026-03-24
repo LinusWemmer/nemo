@@ -1,4 +1,5 @@
 //! This module defines [GlobalAnnotation].
+#![allow(missing_docs)]
 
 use enum_assoc::Assoc;
 use nom::{branch::alt, sequence::{separated_pair, tuple}};

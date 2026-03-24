@@ -20,7 +20,7 @@ use super::{
     },
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GlobalAnnotationKind {
   Assert,
   Verify,
@@ -203,7 +203,7 @@ impl Display for GlobalAnnotation {
 
 impl PartialEq for GlobalAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.predicate == other.predicate && self.restrictions == other.restrictions
+        self.kind == other.kind && self.predicate == other.predicate && self.restrictions == other.restrictions
     }
 }
 
@@ -211,6 +211,7 @@ impl Eq for GlobalAnnotation {}
 
 impl Hash for GlobalAnnotation{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.kind.hash(state);
         self.predicate.hash(state);
         self.restrictions.hash(state);
     }
@@ -232,7 +233,7 @@ impl IterableVariables for GlobalAnnotation {
         let restriction_variables = self
             .restrictions
             .iter_mut()
-            .flat_map(|literal| literal.variables_mut());
+            .flat_map(|op| op.variables_mut());
 
         Box::new(predicate_variables.chain(restriction_variables))
     }

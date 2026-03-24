@@ -8,7 +8,8 @@ use nom::{
 };
 
 use crate::parser::{
-    ParserResult, 
+    ParserResult,
+    ast::rule_annotation::RuleAnnotation,
     context::{ParserContext, context},
     input::ParserInput,
     span::Span,
@@ -80,6 +81,8 @@ pub struct Statement<'a> {
     pub(crate) kind: StatementKind<'a>,
     /// Attributes associated with this statement
     pub(crate) attributes: Vec<Attribute<'a>>,
+    /// Annotations associated with this statement
+    pub(crate) annotations: Vec<RuleAnnotation<'a>>,
 }
 
 impl<'a> Statement<'a> {
@@ -98,6 +101,12 @@ impl<'a> Statement<'a> {
     pub fn attributes(&self) -> &[Attribute<'a>] {
         &self.attributes
     }
+
+    /// Return the annotations attached to this statement
+    pub fn annotations(&self) -> &[RuleAnnotation<'a>] {
+        &self.annotations
+    }
+
 }
 
 const CONTEXT: ParserContext = ParserContext::Statement;
@@ -129,6 +138,7 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
                 opt(DocComment::parse),
                 WSoC::parse,
                 many0(Attribute::parse),
+                many0(RuleAnnotation::parse),
                 delimited(
                     WSoC::parse,
                     StatementKind::parse,
@@ -136,7 +146,7 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
                 ),
             )),
         )(input)
-        .map(|(rest, (comment, _, attributes, statement))| {
+        .map(|(rest, (comment, _, attributes, annotations, statement))| {
             let rest_span = rest.span;
 
             (
@@ -145,6 +155,7 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
                     span: input_span.until_rest(&rest_span),
                     comment,
                     attributes,
+                    annotations,
                     kind: statement,
                 },
             )
@@ -196,9 +207,13 @@ mod test {
                 "@export test :- csv{resource = \"\"}.",
                 ParserContext::Directive,
             ),
-             ( 
+            ( 
                 "#assert test(?X,?Y): ?X<3.",
-                ParserContext::GlobalAnnotation
+                ParserContext::GlobalAnnotation,
+            ),
+            (
+                "[requires: 0<?X, ?X<5]\n a(?x) :- b(?X).",
+                ParserContext::Rule,
             ),
         ];
 

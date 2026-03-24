@@ -70,6 +70,12 @@ impl ASTProgramTranslation {
         }
     }
 
+    /// Process annotations attached to a statement
+    fn process_annotations<'a>(&mut self, statement: &ast::statement::Statement<'a>) {
+       //process_annotations
+
+    }        
+
     /// Translate the given [ProgramAST] into a [ProgramWrite].
     pub fn translate<'a, Writer: Debug + ProgramWrite>(
         mut self,
@@ -87,6 +93,8 @@ impl ASTProgramTranslation {
         for statement in ast.statements() {
             self.process_attributes(statement);
 
+            self.process_annotations(statement);
+
             match statement.kind() {
                 ast::statement::StatementKind::Fact(fact) => {
                     if let Some(fact) = Fact::build_component(&mut self, fact) {
@@ -95,6 +103,7 @@ impl ASTProgramTranslation {
                 }
                 ast::statement::StatementKind::Rule(rule) => {
                     if let Some(rule) = Rule::build_component(&mut self, rule) {
+                        //WIP: think about data structure to map rule annotation to rule, without putting the annotations in the rule
                         program.add_rule(rule);
                     }
                 }

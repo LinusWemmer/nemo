@@ -1,4 +1,5 @@
 //! This module defines [RuleAnnotation].
+#![allow(missing_docs)]
 
 use enum_assoc::Assoc;
 use nom::{sequence::{delimited, pair, terminated, tuple}, branch::alt};
