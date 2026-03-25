@@ -7,6 +7,7 @@ pub(crate) mod directive;
 pub(crate) mod fact;
 pub(crate) mod literal;
 pub(crate) mod rule;
+pub(crate) mod global_annotation;
 mod term;
 
 use std::{collections::HashMap, fmt::Debug, fmt::Display, ops::Range};
@@ -18,7 +19,7 @@ use crate::{
     error::report::ProgramReport,
     parser::{
         ParserErrorReport, ParserState,
-        ast::{self, ProgramAST, global_annotation},
+        ast::{self, ProgramAST},
         error::translate_error_tree,
         input::ParserInput,
     },

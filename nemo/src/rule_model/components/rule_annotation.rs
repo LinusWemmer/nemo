@@ -77,6 +77,7 @@ impl ComponentBehavior for RuleAnnotation {
     }
 
     fn validate(&self) -> Result<(), ValidationReport> {
+        //TODO
         todo!()
     }
 

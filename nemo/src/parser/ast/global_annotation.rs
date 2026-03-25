@@ -32,13 +32,13 @@ pub struct GlobalAnnotation<'a> {
     /// Atom to be restricted
     predicate: Atom<'a>,
     /// [Sequence] containing variable restrictions
-    restriction: Sequence<'a, InfixExpression<'a>>,
+    restrictions: Sequence<'a, InfixExpression<'a>>,
 }
 
 impl<'a> GlobalAnnotation<'a> {
-    /// Return the [Atom] that contains the content of the annotation
-    pub fn restriction(&self) -> impl Iterator<Item = &InfixExpression<'a>> {
-        self.restriction.iter()
+    /// Return the restrictions of the global annotation
+    pub fn restrictions(&self) -> impl Iterator<Item = &InfixExpression<'a>> {
+        self.restrictions.iter()
     }
 
     /// Return the [AnnotationKind] of this annotation
@@ -73,7 +73,7 @@ impl<'a> ProgramAST<'a> for GlobalAnnotation<'a> {
     fn children(&self) -> Vec<&dyn ProgramAST<'a>> {
         let mut result = Vec::<&dyn ProgramAST>::new();
 
-        for expression in self.restriction(){
+        for expression in self.restrictions(){
             result.push(expression);
         }
 
@@ -97,7 +97,7 @@ impl<'a> ProgramAST<'a> for GlobalAnnotation<'a> {
                     Sequence::<InfixExpression>::parse,
                 ),
         )(input)
-        .map(|(rest, ((kind, _, predicate), restriction) )| {
+        .map(|(rest, ((kind, _, predicate), restrictions) )| {
             let rest_span = rest.span;
 
             (
@@ -106,7 +106,7 @@ impl<'a> ProgramAST<'a> for GlobalAnnotation<'a> {
                     span: input_span.until_rest(&rest_span),
                     kind,
                     predicate,
-                    restriction,
+                    restrictions,
                 },
             )
         })

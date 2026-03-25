@@ -32,9 +32,10 @@ pub struct GlobalAnnotation {
     origin: Origin,
     /// Id of this component
     id: ProgramComponentId,
+    
     /// Kind of Annotation
     kind: GlobalAnnotationKind,
-    /// Predicate of the annotation
+    /// predicate of the annotation
     predicate: Atom,
     /// Restrictions on the variables
     restrictions: Vec<Operation>,
@@ -100,10 +101,11 @@ impl ComponentBehavior for GlobalAnnotation {
 
 
     /// Validate the global annotation, the following should hold:
-    ///     * All variables in the restrictions occur in the head/predicate
+    ///     * All variables in the restrictions occur in the predicate/predicate
     ///     * All restrictions are either eq or unequal at highest level
     ///     * TODO: validate that assert atoms are only edb/facts, while the ensure need at least one non fact
     ///     => How would I do this?
+    /// TODO: change type to allow only infix ops, but all of them
     fn validate(&self) -> Result<(), ValidationReport> {
         let mut report = ValidationReport::default();
 
@@ -112,7 +114,7 @@ impl ComponentBehavior for GlobalAnnotation {
             report.merge(child.validate());
         }
 
-        // Check if every restricted variable occurs in the "head" of the restriction
+        // Check if every restricted variable occurs in the "predicate" of the restriction
         let atom_vars = self.predicate_variables();
         for var in self.restricted_variables() {
             if !atom_vars.contains(var) {
@@ -183,7 +185,7 @@ impl Display for GlobalAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.kind {
             GlobalAnnotationKind::Assert => f.write_str("#assert ")?,
-            GlobalAnnotationKind::Verify => f.write_str("# verify ")?,
+            GlobalAnnotationKind::Verify => f.write_str("#verify ")?,
         }
 
         let pred = &self.predicate.to_string();

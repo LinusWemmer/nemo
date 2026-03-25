@@ -39,7 +39,7 @@ pub enum Origin {
 }
 
 impl Origin {
-    /// Create an Oriign pointing to character range represented
+    /// Create an Origin pointing to character range represented
     /// by the given ast node.
     pub fn ast<'a, Component: ComponentSource<Source = Self>, Node: ProgramAST<'a>>(
         mut component: Component,
