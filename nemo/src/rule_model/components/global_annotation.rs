@@ -60,7 +60,7 @@ impl GlobalAnnotation {
     }
 
     /// Return the kind of the annotation
-    pub fn kind(&self) -> GlobalAnnotationKind {
+    pub fn annotation_kind(&self) -> GlobalAnnotationKind {
         self.kind
     }
 

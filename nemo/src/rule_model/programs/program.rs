@@ -81,6 +81,12 @@ impl ProgramWrite for Program {
         self.rules.push(self.statements.len());
         self.statements.push(Statement::Rule(rule))
     }
+
+    //wip: maybe add a different type of program "annotated program"
+    //fn add_global_annotation(&mut self, global_annotation: GlobalAnnotation) {
+    //    self.statements.push(global_annotation)
+    //}
+
 }
 
 impl ComponentBehavior for Program {

@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    components::{fact::Fact, rule::Rule, term::Term},
+    components::{fact::Fact, rule::Rule, term::Term, global_annotation::GlobalAnnotation},
     error::{TranslationReport, translation_error::TranslationError},
 };
 
@@ -71,9 +71,9 @@ impl ASTProgramTranslation {
         }
     }
 
-    /// Process annotations attached to a statement
+    /// Process annotations attached to a statement/rule
     fn process_annotations<'a>(&mut self, statement: &ast::statement::Statement<'a>) {
-       //process_annotations
+        self.report.add(statement, TranslationError::AnnotateNonRule);
 
     }        
 
@@ -111,7 +111,11 @@ impl ASTProgramTranslation {
                 ast::statement::StatementKind::Directive(directive) => {
                     handle_use_directive(&mut self, directive, program);
                 }
-                ast::statement::StatementKind::GlobalAnnotation(global_annotation) => todo!(),
+                ast::statement::StatementKind::GlobalAnnotation(global_annotation) => {
+                    if let Some(global_annotation) = GlobalAnnotation::build_component(&mut self, global_annotation){
+                        program.add_global_annotation(global_annotation);
+                    }
+                },
                 ast::statement::StatementKind::Error(_token) => {
                     panic!(
                         "Faulty statement should result in a parser error and not be propagated."

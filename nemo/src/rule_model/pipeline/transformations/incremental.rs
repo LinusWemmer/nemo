@@ -153,7 +153,7 @@ impl TransformationIncremental {
                 Statement::Output(output) => {
                     normal_predicates.insert(output.predicate().clone());
                 }
-                Statement::Parameter(_) | Statement::Import(_) => {}
+                Statement::Parameter(_) | Statement::Import(_) | Statement::GlobalAnnotation(_) => {} 
             }
         }
 

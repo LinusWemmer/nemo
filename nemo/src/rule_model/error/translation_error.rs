@@ -126,6 +126,11 @@ pub enum TranslationError {
     #[assoc(note = "parameter names must have the form `$name'")]
     #[assoc(code = 130)]
     ParamDeclarationNotGlobal,
+    /// A rule annotation was used on a statment which isn't a rule
+    #[error("annotated non-rule")]
+    #[assoc(note = "only rules can be annotated at the moment")]
+    #[assoc(code = 131)]
+    AnnotateNonRule,
 
     /// Unsupported: Declare statements
     #[error(r#"declare statements are currently unsupported"#)]

@@ -14,6 +14,7 @@ use super::{
         parameter::ParameterDeclaration,
         rule::Rule,
         tag::Tag,
+        global_annotation::GlobalAnnotation,
         term::primitive::variable::{Variable, global::GlobalVariable},
     },
     error::{ValidationReport, validation_error::ValidationError},
@@ -51,6 +52,10 @@ pub trait ProgramWrite {
     /// Add a new fact to this program.
     fn add_fact(&mut self, fact: Fact) {
         self.add_statement(fact.into());
+    }
+    /// Add a new global annotation to this prgoram.
+    fn add_global_annotation(&mut self, global_annotation: GlobalAnnotation) {
+        self.add_statement(global_annotation.into());
     }
 }
 
