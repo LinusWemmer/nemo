@@ -21,7 +21,7 @@ impl TranslationComponent for GlobalAnnotation {
         //TODO: move the annotationkind to be a shared enum
         let kind = match annotation.kind(){ 
           GlobalAnnotationKind::Assert => components::global_annotation::GlobalAnnotationKind::Assert,
-          GlobalAnnotationKind::Verify => components::global_annotation::GlobalAnnotationKind::Assert
+          GlobalAnnotationKind::Verify => components::global_annotation::GlobalAnnotationKind::Verify,
         };
         //  Build the restricted atom:
         let atom = annotation.predicate();

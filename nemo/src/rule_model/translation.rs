@@ -8,11 +8,13 @@ pub(crate) mod fact;
 pub(crate) mod literal;
 pub(crate) mod rule;
 pub(crate) mod global_annotation;
+pub(crate) mod rule_annotation;
 mod term;
 
-use std::{collections::HashMap, fmt::Debug, fmt::Display, ops::Range};
+use std::{collections::HashMap, fmt::{Debug, Display}, ops::Range};
 
 use attribute::{KnownAttributes, process_attributes};
+use rule_annotation::process_annotations;
 use directive::{handle_define_directive, handle_use_directive};
 
 use crate::{
@@ -29,7 +31,7 @@ use crate::{
 };
 
 use super::{
-    components::{fact::Fact, rule::Rule, term::Term, global_annotation::GlobalAnnotation},
+    components::{fact::Fact, rule::Rule, term::Term, global_annotation::GlobalAnnotation, rule_annotation::RuleAnnotation},
     error::{TranslationReport, translation_error::TranslationError},
 };
 
@@ -44,6 +46,9 @@ pub struct ASTProgramTranslation {
 
     /// Attributes for the statement currently being translated
     statement_attributes: Bag<KnownAttributes, Vec<Term>>,
+
+    /// Annotation of the statement currentyl being translated
+    statement_annotations: Vec<RuleAnnotation>,
 
     /// Current error report
     report: TranslationReport,
@@ -73,8 +78,18 @@ impl ASTProgramTranslation {
 
     /// Process annotations attached to a statement/rule
     fn process_annotations<'a>(&mut self, statement: &ast::statement::Statement<'a>) {
-        self.report.add(statement, TranslationError::AnnotateNonRule);
-
+        match statement.kind() {
+            ast::statement::StatementKind::Rule(_) => {
+                if let Some(annotations) =
+                    process_annotations(self, statement.annotations().iter())
+                {
+                    self.statement_annotations = annotations;
+                }
+            },
+            _ => {
+                self.report.add(statement, TranslationError::AnnotateNonRule);
+            }
+        }
     }        
 
     /// Translate the given [ProgramAST] into a [ProgramWrite].
