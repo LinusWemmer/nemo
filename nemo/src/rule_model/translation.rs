@@ -47,7 +47,7 @@ pub struct ASTProgramTranslation {
     /// Attributes for the statement currently being translated
     statement_attributes: Bag<KnownAttributes, Vec<Term>>,
 
-    /// Annotation of the statement currentyl being translated
+    /// Annotation of the statement currently being translated
     statement_annotations: Vec<RuleAnnotation>,
 
     /// Current error report
@@ -58,6 +58,11 @@ impl ASTProgramTranslation {
     /// Return a reference to attributes of the current statement.
     pub(crate) fn statement_attributes(&self) -> &Bag<KnownAttributes, Vec<Term>> {
         &self.statement_attributes
+    }
+
+    /// Return a reference to annotations of the current statement.
+    pub(crate) fn statement_annotations(&self) -> &Vec<RuleAnnotation> {
+        &self.statement_annotations
     }
 }
 
