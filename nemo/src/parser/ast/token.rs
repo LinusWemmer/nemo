@@ -302,18 +302,9 @@ pub enum TokenKind {
     /// Closing token for annotation
     #[assoc(name = rule_annotation::CLOSE_RULE_ANNOTATION)]
     CloseRuleAnnotation,
-    /// Requires annotation
-    #[assoc(name = rule_annotation::REQUIRES_ANNOTATION)]
-    RequiresAnnotation,
-    /// Ensures annotation
-    #[assoc(name = rule_annotation::ENSURE_ANNOTATION)]
-    EnsureAnnotation,
     /// Open assert annotation
     #[assoc(name= annotation_global::OPEN_ASSERT)]
     OpenAssert,
-    /// Open verify annotation
-    #[assoc(name= annotation_global::OPEN_VERIFY)]
-    OpenVerify,
     /// Annotation Seperator
     #[assoc(name= annotation_global::ANNOTATION_SEPERATOR)]
     AnnotationSeperator,
@@ -878,12 +869,9 @@ impl<'a> Token<'a> {
     string_token!(namespace_separator, TokenKind::NamespaceSeparator);
     string_token!(open_attribute, TokenKind::OpenAttribute);
     string_token!(close_attribute, TokenKind::CloseAttribute);
-    string_token!(requires_annotation, TokenKind::RequiresAnnotation);
-    string_token!(ensures_annotation, TokenKind::EnsureAnnotation);
     string_token!(open_rule_annotation, TokenKind::OpenRuleAnnotation);
     string_token!(close_rule_annotation, TokenKind::CloseRuleAnnotation);
     string_token!(open_assert, TokenKind::OpenAssert);
-    string_token!(open_verify, TokenKind::OpenVerify);
     string_token!(annotation_seperator, TokenKind::AnnotationSeperator);
     string_token!(rule_arrow, TokenKind::RuleArrow);
     string_token!(universal_indicator, TokenKind::UniversalIndicator);

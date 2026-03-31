@@ -16,54 +16,39 @@ use super::{
     term::primitive::variable::Variable,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RuleAnnotationKind {
-  Requires,
-  Ensures,
-}
-
 #[derive(Debug, Clone)]
 pub struct RuleAnnotation {
     /// Origin of this component
     origin: Origin,
     /// Id of this component
     id: ProgramComponentId,
-    /// Kind of Annotation
-    kind: RuleAnnotationKind,
-    ///WIP: maybe add reference to the rule it refers to
-    /// Restrictions on the variables
-    restrictions: Vec<Operation>,
+    /// Body of the annotatioin
+    body: Vec<Operation>,
 }
 
 impl RuleAnnotation {
     /// Create a new [RuleAnnotation].
-    pub fn new(kind: RuleAnnotationKind, restrictions: Vec<Operation>) -> Self {
+    pub fn new(body: Vec<Operation>) -> Self {
         Self {
             origin: Origin::Created,
             id: ProgramComponentId::default(),
-            kind,
-            restrictions,
+            body,
         }
     }
 
-    /// Return the kind of the annotation
-    pub fn kind(&self) -> RuleAnnotationKind {
-        self.kind
-    }
-
-    /// Return the restrictions of the annotation
-    pub fn restrictions(&self) -> &Vec<Operation> {
-        &self.restrictions
+    /// Return the body of the annotation
+    pub fn body(&self) -> &Vec<Operation> {
+        &self.body
     }
 
     /// Return a mutable reference to the operations as mut
-    pub fn restrictions_mut(&mut self) -> &mut Vec<Operation> {
-        &mut self.restrictions
+    pub fn body_mut(&mut self) -> &mut Vec<Operation> {
+        &mut self.body
     }
 
     /// Return the set of variables that are bound in the operations
     pub fn restricted_variables(&self) -> HashSet<&Variable> {
-        self.restrictions
+        self.body
         .iter()
         .flat_map(|op| op.variables())
         .collect::<HashSet<_>>()
@@ -110,28 +95,23 @@ impl ComponentIdentity for RuleAnnotation {
 
 impl IterableComponent for RuleAnnotation {
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn super::ProgramComponent> + 'a> {
-        Box::new(component_iterator(self.restrictions.iter()))
+        Box::new(component_iterator(self.body.iter()))
     }
 
     fn children_mut<'a>(
         &'a mut self,
     ) -> Box<dyn Iterator<Item = &'a mut dyn super::ProgramComponent> + 'a> {
-        Box::new(component_iterator_mut(self.restrictions.iter_mut()))
+        Box::new(component_iterator_mut(self.body.iter_mut()))
     }
 }
 
 impl Display for RuleAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
-            RuleAnnotationKind::Requires => f.write_str("[requires ")?,
-            RuleAnnotationKind::Ensures => f.write_str("[ensures ")?,
-        }
-
-        f.write_str(": ")?;
-        for (index, op_literal) in self.restrictions.iter().enumerate() {
+        f.write_str("assert : ")?;
+        for (index, op_literal) in self.body.iter().enumerate() {
             write!(f, "{op_literal}")?;
 
-            if index < self.restrictions.len() - 1 {
+            if index < self.body.len() - 1 {
                 f.write_str(", ")?;
             }
         }
@@ -142,7 +122,7 @@ impl Display for RuleAnnotation {
 
 impl PartialEq for RuleAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind &&  self.restrictions == other.restrictions
+        self.body == other.body
     }
 }
 
@@ -150,17 +130,16 @@ impl Eq for RuleAnnotation {}
 
 impl Hash for RuleAnnotation{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.kind.hash(state);
-        self.restrictions.hash(state);
+        self.body.hash(state);
     }
 }
 
 impl IterableVariables for RuleAnnotation {
     fn variables<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Variable> + 'a> {
-        Box::new(self.restrictions.iter().flat_map(|op| op.variables()))
+        Box::new(self.body.iter().flat_map(|op| op.variables()))
     }
     
     fn variables_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut Variable> + 'a> {
-        Box::new(self.restrictions.iter_mut().flat_map(|op| op.variables_mut()))
+        Box::new(self.body.iter_mut().flat_map(|op| op.variables_mut()))
     }
 }

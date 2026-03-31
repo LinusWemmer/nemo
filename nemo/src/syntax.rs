@@ -90,13 +90,10 @@ pub mod rule_annotation {
     //! This module contains syntax definitions for annotations.
 
     /// The opening token for annotations.
-    pub const OPEN_RULE_ANNOTATION : &str = "[";
+    pub const OPEN_RULE_ANNOTATION : &str = "[assert:";
     /// The closing token for annotation.
     pub const CLOSE_RULE_ANNOTATION: &str = "]";
-    /// test implementation in parser for annotation
-    pub const REQUIRES_ANNOTATION: &str = "requires:";
-    /// Ensure annotation
-    pub const ENSURE_ANNOTATION: &str = "ensure:";
+    
 }
 
 pub mod annotation_global {
@@ -104,8 +101,6 @@ pub mod annotation_global {
     
     /// opening token assert:
     pub const OPEN_ASSERT : &str = "#assert";
-    /// opening token verify:
-    pub const OPEN_VERIFY : &str = "#verify";
     /// seperator atom and restriction
     pub const ANNOTATION_SEPERATOR : &str = ":";
 

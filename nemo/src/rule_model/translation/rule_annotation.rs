@@ -1,9 +1,9 @@
 //! This module contains functions to translate ast nodes into rule annotations
 
 use crate::{
-    parser::ast::{self, rule_annotation::RuleAnnotationKind},
+    parser::ast::{self},
     rule_model::{
-        components::{self, rule_annotation::RuleAnnotation, term::operation::Operation},
+        components::{rule_annotation::RuleAnnotation, term::operation::Operation},
         origin::Origin, translation::complex::infix::InfixOperation,
     },
 };
@@ -19,17 +19,12 @@ pub(crate) fn process_annotations<'a>(
 
     for annotation in annotations{
 
-      let kind = match annotation.kind(){ 
-          RuleAnnotationKind::Requires => components::rule_annotation::RuleAnnotationKind::Requires,
-          RuleAnnotationKind::Ensure  => components::rule_annotation::RuleAnnotationKind::Ensures,
-      };
-
-      let mut restrictions: Vec<Operation> = Vec::default();
-        for expression in annotation.restriction() {
-            restrictions.push(InfixOperation::build_component(translation, expression)?.into_inner());
+      let mut body: Vec<Operation> = Vec::default();
+        for expression in annotation.body() {
+            body.push(InfixOperation::build_component(translation, expression)?.into_inner());
         }
         
-      result.push(Origin::ast(RuleAnnotation::new(kind, restrictions), annotation));
+      result.push(Origin::ast(RuleAnnotation::new(body), annotation));
     }
     
     Some(result)

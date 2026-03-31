@@ -32,25 +32,21 @@ pub struct GlobalAnnotation {
     origin: Origin,
     /// Id of this component
     id: ProgramComponentId,
-    
-    /// Kind of Annotation
-    kind: GlobalAnnotationKind,
     /// predicate of the annotation
     predicate: Atom,
-    /// Restrictions on the variables
-    restrictions: Vec<Operation>,
+    /// body of the annotation
+    body: Vec<Operation>,
 
 }
 
 impl GlobalAnnotation {
     /// Create a new [GlobalAnnotation].
-    pub fn new(kind: GlobalAnnotationKind, predicate: Atom, restrictions: Vec<Operation>) -> Self {
+    pub fn new(predicate: Atom, body: Vec<Operation>) -> Self {
         Self {
             origin: Origin::Created,
             id: ProgramComponentId::default(),
-            kind,
             predicate,
-            restrictions,
+            body,
         }
     }
 
@@ -59,24 +55,19 @@ impl GlobalAnnotation {
         &self.predicate
     }
 
-    /// Return the kind of the annotation
-    pub fn annotation_kind(&self) -> GlobalAnnotationKind {
-        self.kind
-    }
-
-    /// Return the restrictions of the operations
-    pub fn restrictions(&self) -> &Vec<Operation> {
-        &self.restrictions
+    /// Return the body of the operations
+    pub fn body(&self) -> &Vec<Operation> {
+        &self.body
     }
 
     ///TODO Return an iterator over the operations in the body of this annotation TODO: probably ensure these are inequalities?
-    /*pub fn restrictions(&self) -> impl Iterator<Item = &Operation> {
-        self.restrictions.iter()
+    /*pub fn body(&self) -> impl Iterator<Item = &Operation> {
+        self.body.iter()
     }*/
 
     /// Return a mutable reference to the operations as mut
-    pub fn restrictions_mut(&mut self) -> &mut Vec<Operation> {
-        &mut self.restrictions
+    pub fn body_mut(&mut self) -> &mut Vec<Operation> {
+        &mut self.body
     }
 
     /// Return the set of variables in the predicate of the annotation
@@ -86,7 +77,7 @@ impl GlobalAnnotation {
 
     /// Return the set of variables that are bound in the operations
     pub fn restricted_variables(&self) -> HashSet<&Variable> {
-        self.restrictions
+        self.body
             .iter()
             .flat_map(|op| op.variables())
             .collect::<HashSet<_>>()
@@ -101,8 +92,8 @@ impl ComponentBehavior for GlobalAnnotation {
 
 
     /// Validate the global annotation, the following should hold:
-    ///     * All variables in the restrictions occur in the predicate/predicate
-    ///     * All restrictions are either eq or unequal at highest level
+    ///     * All variables in the body occur in the predicate/predicate
+    ///     * All body are either eq or unequal at highest level
     ///     * TODO: validate that assert atoms are only edb/facts, while the ensure need at least one non fact
     ///     => How would I do this?
     /// TODO: change type to allow only infix ops, but all of them
@@ -123,9 +114,9 @@ impl ComponentBehavior for GlobalAnnotation {
             }
         }
 
-        // Check if all restrictions are equality or unequality:
-        for restriction in self.restrictions(){
-            let kind = restriction.operation_kind();
+        // Check if all body are equality or unequality:
+        for operation in self.body(){
+            let kind = operation.operation_kind();
             if !(kind == OperationKind::Equal || kind == OperationKind::Unequals) {
                 report.add(self, ValidationError::UnsoppertedAnnotationRestrictions);
                 return report.result()
@@ -165,37 +156,33 @@ impl ComponentIdentity for GlobalAnnotation {
 impl IterableComponent for GlobalAnnotation {
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn super::ProgramComponent> + 'a> {
         let predicate_iterator = component_iterator(std::iter::once(&self.predicate));
-        let restrictions_iterator = component_iterator(self.restrictions.iter());
+        let body_iterator = component_iterator(self.body.iter());
 
-        Box::new(predicate_iterator.chain(restrictions_iterator))
+        Box::new(predicate_iterator.chain(body_iterator))
     }
 
     fn children_mut<'a>(
         &'a mut self,
     ) -> Box<dyn Iterator<Item = &'a mut dyn super::ProgramComponent> + 'a> {
         let predicate_iterator = component_iterator_mut(std::iter::once(&mut self.predicate));
-        let restrictions_iterator = component_iterator_mut(self.restrictions.iter_mut());
+        let body_iterator = component_iterator_mut(self.body.iter_mut());
         
-        Box::new(predicate_iterator.chain(restrictions_iterator))
+        Box::new(predicate_iterator.chain(body_iterator))
     }
 
 }
 
 impl Display for GlobalAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
-            GlobalAnnotationKind::Assert => f.write_str("#assert ")?,
-            GlobalAnnotationKind::Verify => f.write_str("#verify ")?,
-        }
-
+        f.write_str("#assert ")?;
         let pred = &self.predicate.to_string();
         write!(f, "{pred}")?;
         f.write_str(": ")?;
 
-        for (index, op_literal) in self.restrictions.iter().enumerate() {
+        for (index, op_literal) in self.body.iter().enumerate() {
             write!(f, "{op_literal}")?;
 
-            if index < self.restrictions.len() - 1 {
+            if index < self.body.len() - 1 {
                 f.write_str(", ")?;
             }
         }
@@ -205,7 +192,7 @@ impl Display for GlobalAnnotation {
 
 impl PartialEq for GlobalAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind && self.predicate == other.predicate && self.restrictions == other.restrictions
+        self.predicate == other.predicate && self.body == other.body
     }
 }
 
@@ -213,9 +200,8 @@ impl Eq for GlobalAnnotation {}
 
 impl Hash for GlobalAnnotation{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.kind.hash(state);
         self.predicate.hash(state);
-        self.restrictions.hash(state);
+        self.body.hash(state);
     }
 }
 
@@ -225,7 +211,7 @@ impl IterableVariables for GlobalAnnotation {
             self.predicate()
                 .iter()
                 .flat_map(|atom| atom.variables())
-                .chain(self.restrictions().iter().flat_map(|literal| literal.variables())),
+                .chain(self.body().iter().flat_map(|literal| literal.variables())),
         )
     }
 
@@ -233,7 +219,7 @@ impl IterableVariables for GlobalAnnotation {
         let predicate_variables = self.predicate.variables_mut();
 
         let restriction_variables = self
-            .restrictions
+            .body
             .iter_mut()
             .flat_map(|op| op.variables_mut());
 
@@ -245,7 +231,7 @@ impl IterablePrimitives for GlobalAnnotation {
     fn primitive_terms<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Primitive> + 'a> {
         let predicate_primitives = self.predicate.primitive_terms();
         let restriction_primitives = self
-            .restrictions()
+            .body()
             .iter()
             .flat_map(|literal| literal.primitive_terms());
 
@@ -255,7 +241,7 @@ impl IterablePrimitives for GlobalAnnotation {
     fn primitive_terms_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut Term> + 'a> {
         let predicate_primitives = self.predicate.primitive_terms_mut();
         let restriction_primitives = self
-            .restrictions
+            .body
             .iter_mut()
             .flat_map(|literal| literal.primitive_terms_mut());
 

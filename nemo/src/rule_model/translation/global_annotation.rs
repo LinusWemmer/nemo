@@ -1,9 +1,9 @@
 //! This module contains functions to translate ast nodes into global annotations
 
 use crate::{
-    parser::ast::{self, global_annotation::GlobalAnnotationKind},
+    parser::ast::{self},
     rule_model::{
-        components::{self, atom::Atom, global_annotation::GlobalAnnotation, tag::Tag, term::{Term, operation::Operation}},
+        components::{atom::Atom, global_annotation::GlobalAnnotation, tag::Tag, term::{Term, operation::Operation}},
         origin::Origin, translation::complex::infix::InfixOperation,
     },
 };
@@ -17,12 +17,6 @@ impl TranslationComponent for GlobalAnnotation {
         translation: &mut super::ASTProgramTranslation,
         annotation: &Self::Ast<'a>,
     ) -> Option<Self> {
-        
-        //TODO: move the annotationkind to be a shared enum
-        let kind = match annotation.kind(){ 
-          GlobalAnnotationKind::Assert => components::global_annotation::GlobalAnnotationKind::Assert,
-          GlobalAnnotationKind::Verify => components::global_annotation::GlobalAnnotationKind::Verify,
-        };
         //  Build the restricted atom:
         let atom = annotation.predicate();
         let tag =
@@ -33,13 +27,13 @@ impl TranslationComponent for GlobalAnnotation {
         }
         let predicate = Origin::ast(Atom::new(tag, subterms), atom);
 
-        // Build the restrictions:
-        let mut restrictions: Vec<Operation> = Vec::default();
-        for expression in annotation.restrictions() {
-            restrictions.push(InfixOperation::build_component(translation, expression)?.into_inner());
+        // Build the body:
+        let mut body: Vec<Operation> = Vec::default();
+        for expression in annotation.body() {
+            body.push(InfixOperation::build_component(translation, expression)?.into_inner());
         }
 
 
-        Some(Origin::ast(GlobalAnnotation::new(kind, predicate, restrictions), annotation))
+        Some(Origin::ast(GlobalAnnotation::new(predicate, body), annotation))
     }
 }
