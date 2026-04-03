@@ -83,6 +83,7 @@ impl ASTProgramTranslation {
 
     /// Process annotations attached to a statement/rule
     fn process_annotations<'a>(&mut self, statement: &ast::statement::Statement<'a>) {
+
         match statement.kind() {
             ast::statement::StatementKind::Rule(_) => {
                 if let Some(annotations) =
@@ -92,7 +93,9 @@ impl ASTProgramTranslation {
                 }
             },
             _ => {
-                self.report.add(statement, TranslationError::AnnotateNonRule);
+                if !statement.annotations().is_empty(){
+                    self.report.add(statement, TranslationError::AnnotateNonRule);
+                }
             }
         }
     }        

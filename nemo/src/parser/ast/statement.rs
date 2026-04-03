@@ -212,7 +212,7 @@ mod test {
                 ParserContext::GlobalAnnotation,
             ),
             (
-                "[requires: 0<?X, ?X<5]\n a(?x) :- b(?X).",
+                "[assert: 0<?X, ?X<5]\n a(?x) :- b(?X).",
                 ParserContext::Rule,
             ),
         ];

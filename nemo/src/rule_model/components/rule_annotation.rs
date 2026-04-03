@@ -61,9 +61,9 @@ impl ComponentBehavior for RuleAnnotation {
         ProgramComponentKind::RuleAnnotation
     }
 
+    //TODO: actually validate
     fn validate(&self) -> Result<(), ValidationReport> {
-        //TODO
-        todo!()
+        ValidationReport::default().result()
     }
 
     fn boxed_clone(&self) -> Box<dyn super::ProgramComponent> {
