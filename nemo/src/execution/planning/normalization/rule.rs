@@ -23,6 +23,7 @@ use crate::{
             atom::{body::BodyAtom, head::HeadAtom, import::ImportAtom},
             generator::VariableGenerator,
             operation::Operation,
+            rule_annotation::NormalizedRuleAnnotation,
         },
         operations::{filter::GeneratorFilter, function::GeneratorFunction},
     },
@@ -51,6 +52,9 @@ pub struct NormalizedRule {
     head: Vec<HeadAtom>,
     /// Aggregation and the head index it occurs in
     aggregation: Option<(Aggregation, usize)>,
+
+    /// Annotations of this rule
+    annotations: Vec<NormalizedRuleAnnotation>,
 
     /// Variable order
     variable_order: Option<VariableOrder>,
@@ -153,6 +157,11 @@ impl NormalizedRule {
         self.aggregation.as_ref().map(|(_, index)| *index)
     }
 
+    /// Returns the rule annotations
+    pub fn annotations(&self) -> &Vec<NormalizedRuleAnnotation> {
+        &self.annotations
+    }
+    
     /// Return the id of this rule.
     pub fn id(&self) -> usize {
         self.id
@@ -450,6 +459,12 @@ impl NormalizedRule {
             }
         }
 
+        let mut annotations = Vec::<NormalizedRuleAnnotation>::default();
+        for rule_annotation in rule.annotations().iter(){
+            let annotation = NormalizedRuleAnnotation::normalize_rule_annotation(rule_annotation);
+            annotations.push(annotation);
+        }
+
         let imports = rule
             .imports()
             .map(ImportAtom::normalize_import)
@@ -462,6 +477,7 @@ impl NormalizedRule {
             operations,
             head,
             aggregation,
+            annotations,
             variable_order: None,
             id,
         }

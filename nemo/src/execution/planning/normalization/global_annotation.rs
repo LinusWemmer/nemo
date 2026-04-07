@@ -32,7 +32,7 @@ impl NormalizedGlobalAnnotation{
 
 impl NormalizedGlobalAnnotation{
 
-  /// Normalizes the global annotation
+    /// Normalizes the global annotation
     pub fn normalize_global_annotaion(annotation: &crate::rule_model::components::global_annotation::GlobalAnnotation)
     -> Self
     {
