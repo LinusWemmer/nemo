@@ -11,8 +11,7 @@ use crate::{
     execution::planning::{
         analysis::variable_order::build_preferable_variable_orders,
         normalization::{
-            atom::ground::GroundAtom, export::ExportInstruction, import::ImportInstruction,
-            rule::NormalizedRule,
+            atom::ground::GroundAtom, export::ExportInstruction, global_annotation::NormalizedGlobalAnnotation, import::ImportInstruction, rule::NormalizedRule 
         },
     },
     rule_model::{
@@ -34,6 +33,8 @@ pub struct NormalizedProgram {
     facts: Vec<GroundAtom>,
     /// Output predicates
     output_predicates: Vec<Tag>,
+    /// Global Annotations
+    global_annotations: Vec<NormalizedGlobalAnnotation>,
 
     /// Predicate arities
     predicate_arities: HashMap<Tag, usize>,
@@ -119,6 +120,16 @@ impl NormalizedProgram {
     /// Return a list of facts contained in this program.
     pub fn facts(&self) -> &Vec<GroundAtom> {
         &self.facts
+    }
+
+    /// Return a list of the global annotations of this program-
+    pub fn global_annotations(&self) -> &Vec<NormalizedGlobalAnnotation>{
+        &self.global_annotations
+    }
+
+    /// Add a global annotation to the normalized program
+    pub fn add_global_annotation(&mut self, annotation: NormalizedGlobalAnnotation) {
+        self.global_annotations.push(annotation)
     }
 
     /// Return a list of output predicates contained in this program.
@@ -255,6 +266,13 @@ impl NormalizedProgram {
             let normalized_rule = NormalizedRule::normalize_rule(rule, rule_index);
 
             result.add_rule(normalized_rule);
+        }
+
+        // Handle annotations 
+        for annotation in program.global_annotations() {
+            let normalized_annotation = NormalizedGlobalAnnotation::normalize_global_annotaion(annotation);
+
+            result.add_global_annotation(normalized_annotation);
         }
 
         // Handle imports

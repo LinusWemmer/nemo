@@ -20,12 +20,6 @@ use super::{
     },
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GlobalAnnotationKind {
-  Assert,
-  Verify,
-}
-
 #[derive(Debug, Clone)]
 pub struct GlobalAnnotation {
     /// Origin of this component

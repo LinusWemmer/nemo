@@ -22,7 +22,7 @@ pub struct RuleAnnotation {
     origin: Origin,
     /// Id of this component
     id: ProgramComponentId,
-    /// Body of the annotatioin
+    /// Body of the annotation
     body: Vec<Operation>,
 }
 

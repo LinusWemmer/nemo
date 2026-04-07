@@ -4,9 +4,7 @@ use std::fmt::Write;
 
 use crate::rule_model::{
     components::{
-        ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponent,
-        ProgramComponentKind, component_iterator, component_iterator_mut, rule::Rule,
-        statement::Statement,
+        ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponent, ProgramComponentKind, component_iterator, component_iterator_mut, global_annotation::GlobalAnnotation, rule::Rule, statement::Statement
     },
     error::ValidationReport,
     origin::Origin,
@@ -41,6 +39,15 @@ impl Program {
             _ => unreachable!(),
         }
     }
+
+    /// Returns the global annotations TODO/Note: This should maybe be in programwrite?
+    pub fn global_annotations(&self) -> impl Iterator<Item = &GlobalAnnotation> {
+        self.statements().filter_map(|statement| match statement {
+            Statement::GlobalAnnotation(global_annotation) => Some(global_annotation),
+            _ => None,
+        })
+    }
+
 
     /// Remove all export statements
     pub fn clear_exports(&mut self) {

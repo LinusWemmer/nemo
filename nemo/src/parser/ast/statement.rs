@@ -215,6 +215,10 @@ mod test {
                 "[assert: 0<?X, ?X<5]\n a(?x) :- b(?X).",
                 ParserContext::Rule,
             ),
+            (
+                "#assert test(?X,?Y): ?X<3.",
+                ParserContext::GlobalAnnotation,
+            ),
         ];
 
         for (input, expect) in test {
