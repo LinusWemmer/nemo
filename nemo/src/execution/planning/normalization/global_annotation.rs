@@ -13,7 +13,7 @@ pub struct NormalizedGlobalAnnotation{
     ///Headatom of the annotation TODO: maybe make this a body atom?
     head: HeadAtom,
 
-    /// Restrictions placed on the 
+    /// Restrictions placed on the head atom, TODO
     body: Vec<Operation>,
 }
 

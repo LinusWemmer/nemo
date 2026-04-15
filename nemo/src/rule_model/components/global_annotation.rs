@@ -108,7 +108,7 @@ impl ComponentBehavior for GlobalAnnotation {
             }
         }
 
-        // Check if all body are equality or unequality:
+        // Check if all body are equality or unequality TODO: check for geq, gt, leq, lt
         for operation in self.body(){
             let kind = operation.operation_kind();
             if !(kind == OperationKind::Equal || kind == OperationKind::Unequals) {

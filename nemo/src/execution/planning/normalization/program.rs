@@ -122,9 +122,16 @@ impl NormalizedProgram {
         &self.facts
     }
 
-    /// Return a list of the global annotations of this program-
+    /// Return a list of the global annotations of this program
     pub fn global_annotations(&self) -> &Vec<NormalizedGlobalAnnotation>{
         &self.global_annotations
+    }
+
+    /// Return all global annotations for the given predicate
+    pub fn predicate_to_global_annotation(&self, predicate: Tag) -> Vec<&NormalizedGlobalAnnotation>{
+        self.global_annotations.iter()
+            .filter(|annotation| annotation.head().predicate() == predicate)
+            .collect()
     }
 
     /// Add a global annotation to the normalized program

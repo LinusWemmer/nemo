@@ -31,7 +31,7 @@ impl NormalizedRuleAnnotation{
             .iter()
             .map(Operation::normalize_body_operation)
             .collect::<Vec<_>>();
-        Self{
+        Self {
             body
         }
     }

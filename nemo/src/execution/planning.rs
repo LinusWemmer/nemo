@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub mod normalization;
+pub mod verification;
 
 pub(crate) mod analysis;
 pub(crate) mod operations;
