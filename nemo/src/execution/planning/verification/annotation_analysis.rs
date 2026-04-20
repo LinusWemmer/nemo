@@ -1,22 +1,24 @@
 //! This Module Defines define [AnnotationAnalyzer]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use crate::{
     execution::{
         planning::{
             normalization::{
-                global_annotation::NormalizedGlobalAnnotation, 
+                global_annotation::NormalizedGlobalAnnotation,
                 program::NormalizedProgram, 
                 rule::NormalizedRule
             },
-            verification::restriction::RangeRestriction
+            verification::restriction::{RANGE_INF, RangeRestriction}
         },
         selection_strategy::dependency_graph::{
             graph_constructor::{DependencyGraph, DependencyGraphConstructor},
             graph_positive::GraphConstructorPositive
         }
-    }, rule_model::components::tag::Tag
+    }, rule_model::components::{
+        tag::Tag, term::primitive::{Primitive, variable::Variable}
+    }
 };
 
 /// Analyzes the given annotations
@@ -86,8 +88,6 @@ impl AnnotationAnalyzer{
 
 impl AnnotationAnalyzer{
 
-   
-
     /// Gets the annotations for all edb predicates in the program
     pub fn edb_annotations(program: &NormalizedProgram) -> impl Iterator<Item = &NormalizedGlobalAnnotation> {
         let derived = program.derived_predicates();
@@ -101,7 +101,49 @@ impl AnnotationAnalyzer{
         })
     }
 
-    /// Propagate the annotations through the program
+    /// Gets the restrictions on the frontier variables based on previous restrictions in the body
+    pub fn frontier_var_restrictions(
+        &self,
+        rule: &NormalizedRule,
+        variable_restrictions: &mut HashMap<Variable, Range<i32>>
+    ){
+        let frontier = rule.frontier();
+        for atom in rule.positive(){
+            let predicate = (atom.predicate(), atom.arity());
+
+            if let Some(body_restriction) = self.unary_restrictions.get(&predicate){
+
+                // All predicate positions in the body atom that contain a frontier var
+                let frontier_pos = atom.terms()
+                .enumerate()
+                .filter(|(_, var)| frontier.contains(var));
+
+                // Intersect the existing restriction on the variables with the body restrictions
+                // TODO: make this nicer, the delta should maybe be somewhere else
+                for (pos, var) in frontier_pos{
+                    let restrictions_at_pos = body_restriction.range_res()
+                        .get(&pos)
+                        .unwrap_or(&RANGE_INF);
+
+                    let variable_restriction= variable_restrictions.get(var)
+                        .unwrap_or(&RANGE_INF);
+                    
+                    let updated_restriction = RangeRestriction::intersect_range(restrictions_at_pos, variable_restriction);
+
+                    // Something changed if the range changed meaningfully (i.e. not empty)
+                    if updated_restriction != *variable_restriction && !updated_restriction.is_empty(){
+                        
+                        variable_restrictions.insert(var.clone(), updated_restriction);
+                    }
+                }
+
+            }
+        }
+    }
+
+
+    /// Forward propagation of the annotations through the program, returns true if this works
+    // TODO: change return type
     pub fn propagate_annotations(&mut self){
 
         //Construct unary restrictions for the edb annotations -> These won't change anymore
@@ -133,5 +175,63 @@ impl AnnotationAnalyzer{
                 self.unary_restrictions.insert((predicate, arity), restriction);
             }
         }
+
+        // Iterate over the loops while something changes
+        // TODO: support for rule annotations
+        // TODO: probably move this to its own method
+        // TODO: don't propagate if the some range is already empty
+        let mut delta = true;
+        while delta{
+            delta = false;
+
+            for rule in self.program.rules(){
+                
+                // Ranges of the frontier variables
+                let mut variable_restrictions: HashMap<Variable, Range<i32>> = HashMap::<Variable, Range<i32>>::default();
+
+                self.frontier_var_restrictions(rule, &mut variable_restrictions);
+
+                // Make actual head pred restrictions from variable restrictions,TODO: maybe add restriction for ground terms?
+                for head_atom in rule.head(){
+                    let head_predicate = (head_atom.predicate(), head_atom.arity());
+
+                    let var_pos_in_head = 
+                        head_atom.terms().enumerate()
+                        .filter_map(|(pos, var)| {
+                            match var{
+                                Primitive::Variable(variable) => Some((pos,variable)),
+                                Primitive::Ground(_) => None,
+                            }
+                        });
+                    
+                    // The previous restriction on the head predicate
+                    let head_range_res = self.unary_restrictions
+                        .entry(head_predicate)
+                        .or_insert(RangeRestriction::new());
+
+                    // Update the ranges
+                    for (pos, var) in var_pos_in_head{
+                        if let Some(new_range) = variable_restrictions.get(var){
+                            delta = head_range_res.range_union(pos, new_range) || delta;
+                        }
+                        
+                    }
+                }
+            }
+        }
+
+        // Verify every global annotation, we should probably again move this to its own function
+        // TODO: this should only be done for assert in head predicates
+        // move this to a seperate function called after propagate annotations
+        for annotation in self.program.global_annotations(){
+            let predicate = (annotation.head().predicate(), annotation.head().arity());
+            if let Some(restriction) = self.unary_restrictions.get(&predicate){
+                if restriction.verify_no_empty_term(){
+                    panic!("There is an empty term for some annotation")
+                }
+            }
+        }
+
+        println!("Yay, we at least got here, which would mean this somehow didn't crash");
     }
 }
