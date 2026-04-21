@@ -1,6 +1,6 @@
 //! This module defines restrictions coming from assertion annotations
 
-use std::{collections::HashMap, ops::Range};
+use std::{collections::HashMap, ops::Range, fmt::Display};
 
 use nemo_physical::datavalues::DataValue;
 
@@ -20,8 +20,7 @@ pub struct RangeRestriction{
     
     /// Maps positions in a predicate to logical formulas/ranges? 
     /// WIP, this should probably be some other datatype, e.g. a vector
-    //range_res: HashMap<usize,Range<usize>>,
-    range_res: HashMap<usize, Range<i32>>
+    range_res: HashMap<usize, Range<i32>>,
 }
 
 impl RangeRestriction{
@@ -56,9 +55,8 @@ impl RangeRestriction {
         self.range_res.insert(position, range);
     }
 
-    /// updates the range based on the given operation
-    /// TODO: should probably return whether the range actually updated
-    /// TODO: differentiate between "conjunctive" and "disjunctive" range updates
+
+    /// Updates the range based on the given operation
     pub fn update_range_from_op(
         ranges: &mut HashMap<Variable, Range<i32>>, 
         variable: &Variable,
@@ -72,10 +70,8 @@ impl RangeRestriction {
                 ground_term.value().to_i32_unchecked(),
             _ => panic!("There should only be a value on the right side")
         };
-        // TODO: This could probably be made more elegant with build in rust functions, like .entry().or_default
-        if ranges.contains_key(variable) {
-            //TODO: here, some warning / report feature should be added for incompatible ranges or something or reducing ranges
-            let restriction = ranges.get(variable).expect("something went wrong");
+
+        if let Some(restriction) =  ranges.get(variable) {
             match kind{
                 OperationKind::NumericGreaterthaneq => {
                     ranges.insert(variable.clone(),data_value..restriction.end);},
@@ -110,11 +106,18 @@ impl RangeRestriction {
         start..end
     }
 
-    /// Combines two ranges inclusively, TODO: only if not empty
+    /// Combines two ranges inclusively, or empty range if both are empty
     pub fn combine_range(range_1: &Range<i32>, range_2: &Range<i32>) -> Range<i32>{
-        let start = range_1.start.min(range_2.start);
-        let end = range_1.end.max(range_2.end);
-        start..end
+        match (range_1.is_empty(), range_2.is_empty()){
+            (true, true) => 0..0,
+            (true, false) => range_2.clone(),
+            (false, true) => range_1.clone(),
+            (false, false) => {
+                let start = range_1.start.min(range_2.start);
+                let end = range_1.end.max(range_2.end);
+                start..end
+            },
+        }
     }
     
     /// Takes two range restrictions and calculates the union, returns true if the range was updated
@@ -147,6 +150,28 @@ impl RangeRestriction {
         true
     }
 
+    /// Checks whether the second range restriction completely fits inside the first
+    /// e.g. 0..100, 1..5 => true
+    /// 1..5, 0..100 => false, as there are values in the second which aren't in the first
+    pub fn verify_compatibility(&self, other: &RangeRestriction) -> bool{
+        for (pos, range_1) in self.range_res(){
+            if let Some(range_2) = other.restriction_at_pos(&pos)  {
+                if !(range_1.contains(&range_2.start) && range_1.contains(&(range_2.end-1))){
+                    return false;
+                };
+            } else if !(*range_1 == RANGE_INF) {
+                return false;
+            }
+
+        }
+        true
+    }
+
+    /// TODO: probably very "easy" with smt solver
+    /*pub fn verify_annotation(&self){
+
+    }*/
+
     /// Returns true if the restriction isn't empty for some term
     pub fn verify_no_empty_term(&self) -> bool{
         for range in self.range_res.values(){
@@ -160,7 +185,6 @@ impl RangeRestriction {
     /// Creates a new range restriction from a global annotation
     pub fn from_global_annotation(annotation: &NormalizedGlobalAnnotation) -> Self{
         let mut range_res =  HashMap::<usize, Range<i32>>::new();
-        //let arity = annotation.head().arity();
 
         
         let mut ranges = HashMap::<Variable,Range<i32>>::new();
@@ -205,3 +229,12 @@ impl PartialEq for RangeRestriction{
     }
 }
 
+impl Display for RangeRestriction{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (pos, range) in self.range_res(){
+            write!(f,"{pos}: ")?;
+            write!(f, "{:?}, ", range)?;
+        }
+        f.write_str(" ")
+    }
+}

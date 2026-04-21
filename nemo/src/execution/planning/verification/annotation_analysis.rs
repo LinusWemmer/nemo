@@ -6,9 +6,11 @@ use crate::{
     execution::{
         planning::{
             normalization::{
-                global_annotation::NormalizedGlobalAnnotation,
+                atom::head::HeadAtom, 
+                global_annotation::NormalizedGlobalAnnotation, 
                 program::NormalizedProgram, 
-                rule::NormalizedRule
+                rule::NormalizedRule, 
+                rule_annotation
             },
             verification::restriction::{RANGE_INF, RangeRestriction}
         },
@@ -119,7 +121,6 @@ impl AnnotationAnalyzer{
                 .filter(|(_, var)| frontier.contains(var));
 
                 // Intersect the existing restriction on the variables with the body restrictions
-                // TODO: make this nicer, the delta should maybe be somewhere else
                 for (pos, var) in frontier_pos{
                     let restrictions_at_pos = body_restriction.range_res()
                         .get(&pos)
@@ -130,15 +131,22 @@ impl AnnotationAnalyzer{
                     
                     let updated_restriction = RangeRestriction::intersect_range(restrictions_at_pos, variable_restriction);
 
-                    // Something changed if the range changed meaningfully (i.e. not empty)
-                    if updated_restriction != *variable_restriction && !updated_restriction.is_empty(){
-                        
+                    // Something changed if the range changed meaningfully
+                    if updated_restriction != *variable_restriction {
                         variable_restrictions.insert(var.clone(), updated_restriction);
+                    } else if updated_restriction.is_empty(){
+                        //TODO: temporary measure for testing only, as it may occur only after the nth firing of the rule
+                        println!("rule couldn't fire");
                     }
                 }
 
             }
         }
+    }
+
+    /// Verifies whether the rule annotation matches the current annotations
+    pub fn verify_rule_annotation() -> bool{
+        true
     }
 
 
@@ -158,7 +166,7 @@ impl AnnotationAnalyzer{
         }*/
 
         // Construct annotations for facts, if any -> TODO:This can double up some annotations from the previous step
-        // TODO: This can also unnecesarily double upd the annotations for the same predicate with multiple facts
+        // TODO: This can also unnecesarily double up the annotations for the same predicate with multiple facts
         // -> Verification and generating range need to split up
         for fact in self.program.facts(){
             let annotations = self.program.predicate_to_global_annotation(fact.predicate());
@@ -191,6 +199,16 @@ impl AnnotationAnalyzer{
 
                 self.frontier_var_restrictions(rule, &mut variable_restrictions);
 
+                // TODO: verify & propagate rule annotations
+                /*for rule_annotation in rule.annotations(){
+                    /* idea:
+                    * Generate The formulas from the rule annotation
+                    * Check whether these match with the variable restrictions
+                    * If yes: propagate the extra restrictions (intersection based)
+                    * If no: Assume the rule cannot fire and skip propagating to the head
+                     */
+                }*/
+
                 // Make actual head pred restrictions from variable restrictions,TODO: maybe add restriction for ground terms?
                 for head_atom in rule.head(){
                     let head_predicate = (head_atom.predicate(), head_atom.arity());
@@ -213,25 +231,34 @@ impl AnnotationAnalyzer{
                     for (pos, var) in var_pos_in_head{
                         if let Some(new_range) = variable_restrictions.get(var){
                             delta = head_range_res.range_union(pos, new_range) || delta;
-                        }
-                        
+                        } 
                     }
                 }
             }
         }
 
         // Verify every global annotation, we should probably again move this to its own function
-        // TODO: this should only be done for assert in head predicates
+        // TODO: this should only be done for assert in derived predicates
         // move this to a seperate function called after propagate annotations
         for annotation in self.program.global_annotations(){
-            let predicate = (annotation.head().predicate(), annotation.head().arity());
-            if let Some(restriction) = self.unary_restrictions.get(&predicate){
-                if restriction.verify_no_empty_term(){
+            let predicate: (Tag, usize) = (annotation.head().predicate(), annotation.head().arity());
+
+            // TODO: verify even if no restrictions can be found, which should result in an error message
+            if let Some(propagated_restriction) = self.unary_restrictions.get(&predicate){
+                if !propagated_restriction.verify_no_empty_term(){
                     panic!("There is an empty term for some annotation")
                 }
+                
+                let restriction_from_annotation = RangeRestriction::from_global_annotation(annotation);
+                
+                if !restriction_from_annotation.verify_compatibility(propagated_restriction){
+                    println!("annotation cannot be verified")
+                }
+
+                print!("Ranges of {}: ", predicate.0.name());
+                println!("{}", propagated_restriction);
             }
         }
 
-        println!("Yay, we at least got here, which would mean this somehow didn't crash");
     }
 }
