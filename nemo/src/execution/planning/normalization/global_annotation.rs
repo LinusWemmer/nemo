@@ -1,5 +1,7 @@
 //! This module defines [NormalizedGlobalAnnotation]
 
+use std::fmt::Display;
+
 use crate::execution::planning::normalization::{
   atom::head::HeadAtom, 
   generator::VariableGenerator,
@@ -54,4 +56,22 @@ impl NormalizedGlobalAnnotation{
             body,
         }
   }
+}
+
+impl Display for NormalizedGlobalAnnotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#assert ")?;
+        let pred = &self.head().to_string();
+        write!(f, "{pred}")?;
+        f.write_str(": ")?;
+
+        for (index, op_literal) in self.body.iter().enumerate() {
+            write!(f, "{op_literal}")?;
+
+            if index < self.body.len() - 1 {
+                f.write_str(", ")?;
+            }
+        }
+        f.write_str(" .")
+    }
 }
