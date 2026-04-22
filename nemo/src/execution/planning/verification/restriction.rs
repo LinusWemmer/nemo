@@ -74,13 +74,21 @@ impl RangeRestriction {
         if let Some(restriction) =  ranges.get(variable) {
             match kind{
                 OperationKind::NumericGreaterthaneq => {
-                    ranges.insert(variable.clone(),data_value..restriction.end);},
+                    ranges.insert(variable.clone(), 
+                    RangeRestriction::intersect_range(restriction, &(data_value..restriction.end)));
+                },
                 OperationKind::NumericGreaterthan => {
-                    ranges.insert(variable.clone(), data_value+1..restriction.end);},
+                    ranges.insert(variable.clone(), 
+                    RangeRestriction::intersect_range(restriction, &(data_value+1..restriction.end)));
+                },
                 OperationKind::NumericLessthaneq => {
-                    ranges.insert(variable.clone(), restriction.start..data_value+1);},
+                    ranges.insert(variable.clone(), 
+                    RangeRestriction::intersect_range(restriction,&(restriction.start..data_value+1)));
+                },
                 OperationKind::NumericLessthan => {
-                    ranges.insert(variable.clone(), restriction.start..data_value);},
+                    ranges.insert(variable.clone(),
+                    RangeRestriction::intersect_range(restriction,&(restriction.start..data_value)));
+                },
                 _ => panic!("unsupported operation in annotation")
             }
 
@@ -119,6 +127,16 @@ impl RangeRestriction {
             },
         }
     }
+
+    /// Intersects the old and new range Restrictions
+    pub fn range_intersection(&mut self, other: &RangeRestriction){
+        let other_res = other.range_res();
+        for (pos, other_range) in other_res{
+            self.range_res.entry(*pos)
+                .and_modify(|f| *f = RangeRestriction::intersect_range(f, other_range))
+                .or_insert(other_range.clone());   
+        }
+    }
     
     /// Takes two range restrictions and calculates the union, returns true if the range was updated
     pub fn range_union(&mut self, position: usize, new_range: &Range<i32>) -> bool{
@@ -127,7 +145,7 @@ impl RangeRestriction {
             Some(range) => {
                 let combined = RangeRestriction::combine_range(&range, new_range);
                 self.range_res.insert(position, combined.clone());
-                if range == combined || combined.is_empty(){
+                if range == combined || (range.is_empty() && combined.is_empty()){
                     return false
                 } else {
                     return true
@@ -194,8 +212,10 @@ impl RangeRestriction {
             match operation{
                 
                 Operation::Opreation { kind, subterms } => {
+
                     let left = subterms.first().expect("invalid program component");
                     let right = subterms.get(1).expect("invalid program component");
+
                     if let Operation::Primitive(Primitive::Variable(variable)) = left {
                         RangeRestriction::update_range_from_op(&mut ranges, variable, right, kind);
                     } else if let Operation::Primitive(Primitive::Variable(variable)) = right {

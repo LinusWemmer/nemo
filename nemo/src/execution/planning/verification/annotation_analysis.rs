@@ -1,12 +1,11 @@
 //! This Module Defines define [AnnotationAnalyzer]
 
-use std::{collections::HashMap, ops::Range};
+use std::{collections::{HashMap, HashSet}, ops::Range};
 
 use crate::{
     execution::{
         planning::{
             normalization::{
-                atom::head::HeadAtom, 
                 global_annotation::NormalizedGlobalAnnotation, 
                 program::NormalizedProgram, 
                 rule::NormalizedRule, 
@@ -29,9 +28,9 @@ pub struct AnnotationAnalyzer{
     /// The program to be analized
     program: NormalizedProgram,
 
-    /// Dependency Graph of the underlying program
-    /// TODO: change this to a new implementation of predicate graphs (using petgraph)
+    /// Dependency Graph of the underlying program (TODO: use this to optimize the propagation loop)
     dependency_graph: DependencyGraph,
+
     /// The Set of Restrictions on the predicate with respective arity
     unary_restrictions: HashMap<(Tag,usize), RangeRestriction>
 
@@ -64,27 +63,6 @@ impl AnnotationAnalyzer{
         GraphConstructorPositive::build_graph(&rules)
     }
 
-    //Generates the predicate dependency graph of the positive atoms
-    /*pub fn generate_predicate_dependency(program: &NormalizedProgram) -> Graph<(Tag,usize), (), Directed>{
-        let mut graph = Graph::<(Tag,usize), (), Directed>::new();
-        let mut predicate_to_node_index  = Vec::new();
-
-        for predicate in program.predicates(){
-            let node_index = graph.add_node(predicate);
-            predicate_to_node_index.push(node_index);
-        }
-
-
-        for rule in program.rules(){
-            for head_predicate in rule.predicates_head() {
-                for body_predicate in rule.predicates_positive() {
-                    graph.add_edge(body_predicate, head_predicate, ());
-                }
-            }
-        }
-        graph
-    }*/
-
 }
 
 
@@ -93,14 +71,11 @@ impl AnnotationAnalyzer{
     /// Gets the annotations for all edb predicates in the program
     pub fn edb_annotations(program: &NormalizedProgram) -> impl Iterator<Item = &NormalizedGlobalAnnotation> {
         let derived = program.derived_predicates();
+
         program.global_annotations()
         .iter()
-        .filter_map(|annotation| {
-            match derived.contains(&NormalizedGlobalAnnotation::head(annotation).predicate()){
-                true => None,
-                false => Some(annotation)
-            }
-        })
+        .filter(|annotation|
+            !derived.contains(&NormalizedGlobalAnnotation::head(annotation).predicate()))
     }
 
     /// Gets the restrictions on the frontier variables based on previous restrictions in the body
@@ -149,39 +124,63 @@ impl AnnotationAnalyzer{
         true
     }
 
+    /// Verifies whether the global annotation holds given the current restrictions
+    pub fn verify_global_annotation(&self, annotation :&NormalizedGlobalAnnotation) -> bool{
+        let predicate= (annotation.head().predicate(), annotation.head().arity());
+
+        if let Some(propagated_restriction) = self.unary_restrictions.get(&predicate){
+            
+            if !propagated_restriction.verify_no_empty_term(){
+                panic!("There is an empty term for some annotation for {}", predicate.0)
+            }
+            
+            let restriction_from_annotation = RangeRestriction::from_global_annotation(annotation);
+            
+            if !restriction_from_annotation.verify_compatibility(propagated_restriction){
+                println!("annotation for {} cannot be verified", predicate.0)
+            }
+
+            print!("Ranges of {}: ", predicate.0.name());
+            println!("{}", propagated_restriction);
+        }
+        true
+    }
+
 
     /// Forward propagation of the annotations through the program, returns true if this works
     // TODO: change return type
     pub fn propagate_annotations(&mut self){
 
-        //Construct unary restrictions for the edb annotations -> These won't change anymore
-        // This is neccesary because of imports -> i.e. 
-        // -> TODO: This would change with imports, if the import predicates are edb
-        /*for annotation in AnnotationAnalyzer::edb_annotations(&self.program){
-            let restriction = RangeRestriction::from_global_annotation(annotation);
-            let predicate = annotation.head().predicate();
-            let arity = annotation.head().arity();
+        // Construct unary restrictions for the edb annotations
+        let derived = self.program.derived_predicates();
 
-            self.unary_restrictions.insert((predicate, arity), restriction);
-        }*/
+        let mut base_predicates : HashSet<(Tag, usize)> = self.program.predicates()
+            .filter(|(pred, _)| !derived.contains(pred)).collect();
 
-        // Construct annotations for facts, if any -> TODO:This can double up some annotations from the previous step
-        // TODO: This can also unnecesarily double up the annotations for the same predicate with multiple facts
-        // -> Verification and generating range need to split up
         for fact in self.program.facts(){
-            let annotations = self.program.predicate_to_global_annotation(fact.predicate());
-            for annotation in annotations{
-                let restriction = RangeRestriction::from_global_annotation(annotation);
-                let predicate = annotation.head().predicate();
-                let arity = annotation.head().arity();
-                    
-                //TODO: this shouldn't panic and instead log this somewhere
-                if !restriction.verify_ground_atom(fact){
-                    panic!("The fact cannot satisfy the annotation")
-                }
+            base_predicates.insert((fact.predicate(), fact.arity()));
+        }
 
-                self.unary_restrictions.insert((predicate, arity), restriction);
+        for (predicate, arity) in base_predicates{
+            let annotations = self.program.predicate_to_global_annotation(&predicate);  
+
+            for annotation in annotations{
+                let new_restriction = RangeRestriction::from_global_annotation(annotation);
+
+                self.unary_restrictions
+                    .entry((predicate.clone(), arity))
+                    .and_modify(|old_restriction| old_restriction.range_intersection(&new_restriction))
+                    .or_insert(new_restriction);
             }
+        }
+
+        // Verify all facts 
+        for fact in self.program.facts(){
+            if let Some(restriction) = self.unary_restrictions.get(&(fact.predicate(), fact.arity())){
+                if !restriction.verify_ground_atom(fact){
+                    println!("The fact {} cannot satisfy its restrictions.", fact)
+                }
+            } 
         }
 
         // Iterate over the loops while something changes
@@ -227,7 +226,7 @@ impl AnnotationAnalyzer{
                         .entry(head_predicate)
                         .or_insert(RangeRestriction::new());
 
-                    // Update the ranges
+                    // Update the ranges TODO: should this maybe be completely moved into range_union?
                     for (pos, var) in var_pos_in_head{
                         if let Some(new_range) = variable_restrictions.get(var){
                             delta = head_range_res.range_union(pos, new_range) || delta;
@@ -237,27 +236,11 @@ impl AnnotationAnalyzer{
             }
         }
 
-        // Verify every global annotation, we should probably again move this to its own function
-        // TODO: this should only be done for assert in derived predicates
-        // move this to a seperate function called after propagate annotations
+        // Verify every global annotation for derived predicates
         for annotation in self.program.global_annotations(){
-            let predicate: (Tag, usize) = (annotation.head().predicate(), annotation.head().arity());
-
-            // TODO: verify even if no restrictions can be found, which should result in an error message
-            if let Some(propagated_restriction) = self.unary_restrictions.get(&predicate){
-                if !propagated_restriction.verify_no_empty_term(){
-                    panic!("There is an empty term for some annotation")
-                }
-                
-                let restriction_from_annotation = RangeRestriction::from_global_annotation(annotation);
-                
-                if !restriction_from_annotation.verify_compatibility(propagated_restriction){
-                    println!("annotation cannot be verified")
-                }
-
-                print!("Ranges of {}: ", predicate.0.name());
-                println!("{}", propagated_restriction);
-            }
+            if self.program.derived_predicates().contains(&annotation.head().predicate()){
+                self.verify_global_annotation(annotation);
+            }            
         }
 
     }

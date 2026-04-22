@@ -128,9 +128,9 @@ impl NormalizedProgram {
     }
 
     /// Return all global annotations for the given predicate
-    pub fn predicate_to_global_annotation(&self, predicate: Tag) -> Vec<&NormalizedGlobalAnnotation>{
+    pub fn predicate_to_global_annotation(&self, predicate: & Tag) -> Vec<&NormalizedGlobalAnnotation>{
         self.global_annotations.iter()
-            .filter(|annotation| annotation.head().predicate() == predicate)
+            .filter(|annotation| &annotation.head().predicate() == predicate)
             .collect()
     }
 
