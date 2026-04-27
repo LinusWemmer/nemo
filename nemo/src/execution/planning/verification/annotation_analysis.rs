@@ -11,7 +11,7 @@ use crate::{
                 rule::NormalizedRule, 
                 rule_annotation
             },
-            verification::restriction::{RANGE_INF, RangeRestriction}
+            verification::{restriction::{RANGE_INF, RangeRestriction}, smt_builder::Lowering}
         },
         selection_strategy::dependency_graph::{
             graph_constructor::{DependencyGraph, DependencyGraphConstructor},
@@ -180,6 +180,8 @@ impl AnnotationAnalyzer{
                 if !restriction.verify_ground_atom(fact){
                     println!("The fact {} cannot satisfy its restrictions.", fact)
                 }
+                print!("Ranges of {}: ", fact.predicate());
+                println!("{}", restriction);
             } 
         }
 
@@ -198,15 +200,16 @@ impl AnnotationAnalyzer{
 
                 self.frontier_var_restrictions(rule, &mut variable_restrictions);
 
-                // TODO: verify & propagate rule annotations
-                /*for rule_annotation in rule.annotations(){
+                
+                for rule_annotation in rule.annotations(){
+                    let _ = Lowering::check_rule(rule);
                     /* idea:
                     * Generate The formulas from the rule annotation
                     * Check whether these match with the variable restrictions
                     * If yes: propagate the extra restrictions (intersection based)
                     * If no: Assume the rule cannot fire and skip propagating to the head
                      */
-                }*/
+                }
 
                 // Make actual head pred restrictions from variable restrictions,TODO: maybe add restriction for ground terms?
                 for head_atom in rule.head(){
@@ -231,6 +234,7 @@ impl AnnotationAnalyzer{
                         if let Some(new_range) = variable_restrictions.get(var){
                             delta = head_range_res.range_union(pos, new_range) || delta;
                         } 
+                        // TODO: maybe check if it matches the assert here already?
                     }
                 }
             }
