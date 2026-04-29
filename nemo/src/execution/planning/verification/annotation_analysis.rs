@@ -8,8 +8,7 @@ use crate::{
             normalization::{
                 global_annotation::NormalizedGlobalAnnotation, 
                 program::NormalizedProgram, 
-                rule::NormalizedRule, 
-                rule_annotation
+                rule::NormalizedRule
             },
             verification::{restriction::{RANGE_INF, RangeRestriction}, smt_builder::Lowering}
         },
@@ -82,7 +81,7 @@ impl AnnotationAnalyzer{
     pub fn rule_var_restrictions(
         &self,
         rule: &NormalizedRule,
-        variable_restrictions: &mut HashMap<Variable, Range<i32>>
+        variable_restrictions: &mut HashMap<Variable, Range<i64>>
     ){
         let rule_vars = rule.variables().collect::<HashSet<_>>();
         for atom in rule.positive(){
@@ -191,7 +190,7 @@ impl AnnotationAnalyzer{
 
             for rule in self.program.rules(){
                 
-                let mut variable_restrictions: HashMap<Variable, Range<i32>> = HashMap::<Variable, Range<i32>>::default();
+                let mut variable_restrictions: HashMap<Variable, Range<i64>> = HashMap::<Variable, Range<i64>>::default();
                 // TODO: move this into rule_var restrictions and return, this doesn't need to be mut otherwise
                 //Restrictions on the variables in the rule at current iteration
                 self.rule_var_restrictions(rule, &mut variable_restrictions);
@@ -203,25 +202,39 @@ impl AnnotationAnalyzer{
                     * If yes: propagate the extra restrictions (intersection based)
                     * If no: Assume the rule cannot fire and skip propagating to the head
                      */
-                // TODO: just to test, change to actually collecting all
-                let annotation_ops = rule.annotations().iter()
-                    .flat_map(|ann| ann.body())
-                    .map(|op| op.clone())
-                    .collect();
-
-                let vars: Vec<&Variable> = rule.variables().collect();
-                
-                let head_vars: HashSet<Variable> = rule.head().iter()
-                    .flat_map(|head| head.variables())
-                    .map(|var| var.clone())
-                    .collect();
-
-                // TODO: restrict only to vars that occur in arithmetic predicates,
-                // the rest can be optimized much cheaper than with smt call
-                let foo = Lowering::get_frontier_range(&variable_restrictions, &annotation_ops, rule.operations(), &head_vars, vars);
-
                 // Make actual head pred restrictions from variable restrictions,TODO: maybe add restriction for ground terms?
                 if sat{
+                    // TODO: just to test, change to actually collecting all
+                    let annotation_ops: Vec<crate::execution::planning::normalization::operation::Operation> = rule.annotations().iter()
+                        .flat_map(|ann| ann.body())
+                        .map(|op| op.clone())
+                        .collect();
+
+                    let rule_vars: Vec<&Variable> = rule.variables().collect();
+
+                    let op_vars: HashSet<Variable> = rule.operations().iter()
+                        .flat_map(|op|op.variables())
+                        .cloned()
+                        .collect();
+                    let head_vars: HashSet<Variable> = rule.head().iter()
+                        .flat_map(|head| head.variables())
+                        .cloned()
+                        .collect();
+                    let arith_head_vars: HashSet<Variable> = op_vars.intersection(&head_vars)
+                        .cloned()
+                        .collect();
+
+                    // TODO: restrict only to vars that occur in arithmetic predicates,
+                    // TODO: maybe intersect and map with var res
+                    // the rest can be optimized much cheaper than with smt call
+                    let arith_head_var_ranges = Lowering::get_head_var_range(
+                        &variable_restrictions, 
+                        &annotation_ops,
+                        rule.operations(), 
+                        &arith_head_vars, 
+                        rule_vars
+                    ).expect("Getting max/min range failed");
+
                     for head_atom in rule.head(){
                         let head_predicate = (head_atom.predicate(), head_atom.arity());
 
@@ -239,11 +252,20 @@ impl AnnotationAnalyzer{
                             .entry(head_predicate)
                             .or_insert(RangeRestriction::new());
 
+                        
                         // Update the ranges TODO: should this maybe be completely moved into range_union?
                         for (pos, var) in var_pos_in_head{
-                            if let Some(new_range) = variable_restrictions.get(var){
-                                delta = head_range_res.range_union(pos, new_range) || delta;
-                            } 
+                            match (variable_restrictions.get(var), arith_head_var_ranges.get(var)){
+                                (None, None) => (),
+                                (None, Some(range)) =>
+                                    delta = head_range_res.range_union(pos, range) || delta,
+                                (Some(range), None) => 
+                                    delta = head_range_res.range_union(pos, range) || delta,
+                                (Some(range_1), Some(range_2)) => {
+                                    let inter_range = RangeRestriction::intersect_range(range_1, range_2);
+                                    delta = head_range_res.range_union(pos, &inter_range) || delta;
+                                },
+                            }
                             // TODO: maybe check if it matches the assert here already?
                         }
                     }

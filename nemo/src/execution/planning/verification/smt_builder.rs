@@ -1,10 +1,10 @@
-//! This module define the lowering for rules to smtlib
+//! This module define the lowering for rules to smtlib,
+//! as well as evaluating these lowerings
 
 use core::ops::Range;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Add, Mul, Sub};
 
-use smtlib::lowlevel::ast::Command;
 use smtlib::{
     Error,
     funs::Fun,
@@ -12,7 +12,7 @@ use smtlib::{
     backend::z3_binary::Z3Binary,
     Int, 
     Bool, 
-    SatResultWithModel, 
+    SatResult, 
     Solver, 
     Storage, 
     prelude::*
@@ -151,11 +151,11 @@ impl<'a> Lowering<'a>{
     }
 
     /// Lowers the restrictions on the frontier variables to the solver
-    pub fn lower_restrictions(&self, restrictions: &HashMap<Variable, Range<i32>>, var_map: &HashMap<Variable, Int<'a>>, solver: &mut Solver<'a , Z3Binary>){
+    pub fn lower_restrictions(&self, restrictions: &HashMap<Variable, Range<i64>>, var_map: &HashMap<Variable, Int<'a>>, solver: &mut Solver<'a , Z3Binary>){
         for (var, range) in restrictions{
             if let Some(int_var) = var_map.get(var){
-                let lower_bound = Int::new(self.st, range.start as i64);
-                let upper_bound = Int::new(self.st, range.end as i64);
+                let lower_bound = Int::new(self.st, range.start);
+                let upper_bound = Int::new(self.st, range.end);
 
                 // Assert the variable is within the bounds
                 solver.assert(int_var.ge(lower_bound)).expect("failed asserting lower bound");
@@ -203,7 +203,7 @@ impl<'a> Lowering<'a>{
 
 impl<'a> Lowering<'a>{
     /// Checks whether the given rule is satisfiable with the given annotations TODO: add current range restriction
-    pub fn check_rule(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i32>>) -> Result<bool, Error>{
+    pub fn check_rule(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i64>>) -> Result<bool, Error>{
         let st = Storage::new();
         let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
 
@@ -234,41 +234,34 @@ impl<'a> Lowering<'a>{
         // TODO: should probably check whether there exists a model not satisfying the annotations
         // What I mean by this -> There should be a seperate check to see whether the annotations are actually
         // "satisfied", e.g. for recursion "invariants" that they hold
-        let result = solver.check_sat_with_model()?;
+        let result = solver.check_sat()?;
         match result{
-            SatResultWithModel::Unsat => {println!("UnSAT"); Ok(false)},
-            SatResultWithModel::Sat(model) => {println!("SAT: {model}"); Ok(true)},
-            SatResultWithModel::Unknown => {println!("Unknown"); Ok(false)},
+            SatResult::Unsat => {println!("Unsat"); Ok(false)},
+            SatResult::Sat => {println!("Sat"); Ok(true)},
+            SatResult::Unknown => {println!("Unknown"); Ok(false)},
         }
     }
 
     /// Get the minimum & maximum of the frontier variables
-    pub fn get_frontier_range(
-        restrictions: &HashMap<Variable, Range<i32>>, 
+    pub fn get_head_var_range(
+        restrictions: &HashMap<Variable, Range<i64>>, 
         annotation_ops: &Vec<Operation>,
         body_ops: &Vec<Operation>,
         head_vars: &HashSet<Variable>,
-        vars: Vec<&Variable>
-    ) -> Result<(),Error>{
-
-        println!("getting frontier range");
+        rule_vars: Vec<&Variable>
+    ) -> Result<HashMap<Variable, Range<i64>>,Error>{
         let st = Storage::new();
         let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
 
         // TODO: set logic to some sort of LIA or so
         //solver.set_logic(Logi)
 
-        solver.set_logger((
-        |cmd: Command<'_>| println!("> {cmd}"),
-        |_cmd: Command<'_>, res: &str| println!("=> {}", res.trim_end()),
-        ));
-
         let mut lowering = Lowering::new(&st);
         
         let mut var_map = HashMap::<Variable, Int<'a>>::new();
 
         // Build the vars, could be converted to iterator and so on TODO: use the new function
-        for var in vars{
+        for var in rule_vars{
             if let Some(name) = var.name(){
                 var_map.insert(var.clone(), *Int::new_const(&st, name));
             }
@@ -286,22 +279,51 @@ impl<'a> Lowering<'a>{
         for operation in body_ops{
             solver.assert(lowering.lower_operation(operation, &var_map)?.as_bool()?).expect("failed to assert op");
         }
+        
+        // TODO: should actually be done for each variable individually
+        let min_values = solver.scope(|solver|{
+            for var in head_vars{
+                let var_const = var_map.get(var).expect("var should be registered");
+                solver.minimize(*var_const)?;
+            }
+            solver.check_sat()?;
 
+            let mut result= HashMap::<Variable, i64>::new();
+            for var in head_vars{
+                let var_term: &Int<'_> = var_map.get(var).expect("var should be registered");
+                let value: i64 = solver.eval(*var_term)?.try_into().expect("should return value");
+                result.insert(var.clone(), value);
+            }
+            
+            Ok(result)
+        })?;
+
+        let max_values = solver.scope(|solver|{
+            for var in head_vars{
+                let var_const = var_map.get(var).expect("var should be registered");
+                solver.maximize(*var_const)?;
+            }
+            solver.check_sat()?;
+
+            let mut result= HashMap::<Variable, i64>::new();
+            for var in head_vars{
+                let var_term: &Int<'_> = var_map.get(var).expect("var should be registered");
+                let value: i64 = solver.eval(*var_term)?.try_into().expect("should return value");
+                result.insert(var.clone(), value);
+            }
+            
+            Ok(result)
+        })?;
+        
+        // Generate range from min, max
+        let mut var_range = HashMap::<Variable, Range<i64>>::new();
         for var in head_vars{
-            // TODO: fr
-            let var_const = var_map.get(var).expect("var should be registered");
-            solver.minimize(*var_const)?;
+            let min = *min_values.get(var).expect("min value should be there");
+            let max = *max_values.get(var).expect("max value should be there");
+            var_range.insert(var.clone(), min..max);
         }
 
-        let _result = solver.check_sat()?;
-
-        for var in head_vars{
-            let var_term = var_map.get(var).expect("var should be registered");
-            let result = solver.eval(*var_term)?;
-            println!("{result}");
-        }
-
-        Ok(())
+        Ok(var_range)
     }
                 
 }

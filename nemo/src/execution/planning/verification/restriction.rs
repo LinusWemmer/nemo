@@ -12,7 +12,7 @@ use crate::{execution::planning::normalization::{
 use crate::rule_model::components::term::operation::operation_kind::OperationKind;
 
 /// Infinite Range
-pub const RANGE_INF: Range<i32> = i32::MIN..i32::MAX;
+pub const RANGE_INF: Range<i64> = i64::MIN..i64::MAX;
 
 /// Represents a range restriction for now, very WIP
 #[derive(Debug, Clone, Default)]
@@ -20,17 +20,17 @@ pub struct RangeRestriction{
     
     /// Maps positions in a predicate to logical formulas/ranges? 
     /// WIP, this should probably be some other datatype, e.g. a vector
-    range_res: HashMap<usize, Range<i32>>,
+    range_res: HashMap<usize, Range<i64>>,
 }
 
 impl RangeRestriction{
     /// Returns the Map of restrictions
-    pub fn range_res(&self) -> &HashMap<usize, Range<i32>>{
+    pub fn range_res(&self) -> &HashMap<usize, Range<i64>>{
         &self.range_res
     }
 
     /// Get the range of a single position within a predicate
-    pub fn restriction_at_pos(&self, position: &usize) -> Option<&Range<i32>>{
+    pub fn restriction_at_pos(&self, position: &usize) -> Option<&Range<i64>>{
         self.range_res.get(position)
     }
 }
@@ -44,30 +44,30 @@ impl RangeRestriction {
     }
 
     /// Creates a new range restriction from a map of positions two ranges
-    pub fn new_from_map(range_map: &HashMap<usize, Range<i32>> ) -> Self{
+    pub fn new_from_map(range_map: &HashMap<usize, Range<i64>> ) -> Self{
         Self { 
             range_res: range_map.clone()
         }
     }
 
     /// Insert the given range at the position
-    pub fn insert_range(&mut self, position: usize, range: Range<i32>){
+    pub fn insert_range(&mut self, position: usize, range: Range<i64>){
         self.range_res.insert(position, range);
     }
 
 
     /// Updates the range based on the given operation
     pub fn update_range_from_op(
-        ranges: &mut HashMap<Variable, Range<i32>>, 
+        ranges: &mut HashMap<Variable, Range<i64>>, 
         variable: &Variable,
         term: &Operation, 
         kind: &OperationKind
     ){
 
         // For now: only allow one data value on the other side of an (in)equality  
-        let data_value: i32 = match term {
+        let data_value: i64 = match term {
             Operation::Primitive(Ground(ground_term)) =>
-                ground_term.value().to_i32_unchecked(),
+                ground_term.value().to_i64_unchecked(),
             _ => panic!("There should only be a value on the right side")
         };
 
@@ -99,27 +99,27 @@ impl RangeRestriction {
         } else {
             match kind{
                 OperationKind::NumericGreaterthaneq => {
-                    ranges.insert(variable.clone(),data_value..i32::MAX);},
+                    ranges.insert(variable.clone(),data_value..i64::MAX);},
                 OperationKind::NumericGreaterthan => {
-                    ranges.insert(variable.clone(), data_value+1..i32::MAX);},
+                    ranges.insert(variable.clone(), data_value+1..i64::MAX);},
                 OperationKind::NumericLessthaneq => {
-                    ranges.insert(variable.clone(), i32::MIN..data_value+1);},
+                    ranges.insert(variable.clone(), i64::MIN..data_value+1);},
                 OperationKind::NumericLessthan => {
-                    ranges.insert(variable.clone(), i32::MIN..data_value);},
+                    ranges.insert(variable.clone(), i64::MIN..data_value);},
                 _ => panic!("unsupported operation in annotation")
             }
         }
     }
 
     /// Return the intersection of two ranges, might result in an empty intersection
-    pub fn intersect_range(range_1: &Range<i32>, range_2: &Range<i32>) -> Range<i32>{
+    pub fn intersect_range(range_1: &Range<i64>, range_2: &Range<i64>) -> Range<i64>{
         let start = range_1.start.max(range_2.start);
         let end = range_1.end.min(range_2.end);
         start..end
     }
 
     /// Combines two ranges inclusively, or empty range if both are empty
-    pub fn combine_range(range_1: &Range<i32>, range_2: &Range<i32>) -> Range<i32>{
+    pub fn combine_range(range_1: &Range<i64>, range_2: &Range<i64>) -> Range<i64>{
         match (range_1.is_empty(), range_2.is_empty()){
             (true, true) => 0..0,
             (true, false) => range_2.clone(),
@@ -143,7 +143,7 @@ impl RangeRestriction {
     }
     
     /// Takes two range restrictions and calculates the union, returns true if the range was updated
-    pub fn range_union(&mut self, position: usize, new_range: &Range<i32>) -> bool{
+    pub fn range_union(&mut self, position: usize, new_range: &Range<i64>) -> bool{
         let old_range = self.range_res.insert(position, new_range.clone());
         match old_range {
             Some(range) => {
@@ -163,7 +163,7 @@ impl RangeRestriction {
     pub fn verify_ground_atom(&self, atom: &GroundAtom) -> bool {
         for (position, ground_term) in atom.terms().enumerate(){
             if let Some(range) = self.range_res().get(&position){
-                let data_value: i32 = ground_term.value().to_i32_unchecked();
+                let data_value: i64 = ground_term.value().to_i64_unchecked();
                 if !range.contains(&data_value){
                     return false;
                 }
@@ -206,10 +206,10 @@ impl RangeRestriction {
 
     /// Creates a new range restriction from a global annotation
     pub fn from_global_annotation(annotation: &NormalizedGlobalAnnotation) -> Self{
-        let mut range_res =  HashMap::<usize, Range<i32>>::new();
+        let mut range_res =  HashMap::<usize, Range<i64>>::new();
 
         
-        let mut ranges = HashMap::<Variable,Range<i32>>::new();
+        let mut ranges = HashMap::<Variable,Range<i64>>::new();
      
         // Generate the ranges for the variables, it should probably be checked whether everything is valid (TODO), i.e. unequals
         for operation in annotation.body(){
