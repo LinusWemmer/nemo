@@ -89,6 +89,10 @@ impl RangeRestriction {
                     ranges.insert(variable.clone(),
                     RangeRestriction::intersect_range(restriction,&(restriction.start..data_value)));
                 },
+                OperationKind::Equal => {
+                    ranges.insert(variable.clone(), 
+                    RangeRestriction::intersect_range(restriction, &(data_value..data_value+1)));
+                }
                 _ => panic!("unsupported operation in annotation")
             }
 

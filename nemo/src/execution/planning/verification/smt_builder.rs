@@ -1,8 +1,10 @@
+//! This module define the lowering for rules to smtlib
 
-
-use std::collections::HashMap;
+use core::ops::Range;
+use std::collections::{HashMap, HashSet};
 use std::ops::{Add, Mul, Sub};
 
+use smtlib::lowlevel::ast::Command;
 use smtlib::{
     Error,
     funs::Fun,
@@ -15,6 +17,7 @@ use smtlib::{
     Storage, 
     prelude::*
 };
+
 
 use crate::nemo_physical::datavalues::DataValue;
 
@@ -80,6 +83,7 @@ impl<'a> Lowering<'a>{
             .map(|term| var_map.get(term).expect("anon var not supported yet"))
             .map(|f|f.into_dynamic())
             .collect();
+
         pred_fun.call(&args)?.as_bool()
     }
 
@@ -98,7 +102,7 @@ impl<'a> Lowering<'a>{
     pub fn lower_primitive(
         &self,
         primitive: &Primitive,
-        var_map: &'a HashMap<Variable, Int<'a>>
+        var_map: &HashMap<Variable, Int<'a>>
     )-> Int<'a>{
 
         match primitive{
@@ -109,14 +113,14 @@ impl<'a> Lowering<'a>{
     }
 
     ///Converts rule annotation to smt representation
-    pub fn lower_rule_annotation(&mut self, annotation: &NormalizedRuleAnnotation, var_map: &'a HashMap<Variable, Int<'a>>) -> Vec<Bool<'a>>{
+    pub fn lower_rule_annotation(&mut self, annotation: &NormalizedRuleAnnotation, var_map: &HashMap<Variable, Int<'a>>) -> Vec<Bool<'a>>{
         annotation.body().iter()
             .map(|operation| self.lower_operation(operation, var_map).expect("should work").as_bool().expect("please please please"))
             .collect()
     }
 
     /// Converts operation into smt representation
-    pub fn lower_operation(&mut self, operation: &Operation, var_map: &'a HashMap<Variable, Int<'a>>) -> Result<Dynamic<'a>,Error>{
+    pub fn lower_operation(&mut self, operation: &Operation, var_map: &HashMap<Variable, Int<'a>>) -> Result<Dynamic<'a>,Error>{
         match operation{
             Operation::Primitive(primitive) => Ok(self.lower_primitive(primitive, var_map).into()),
             Operation::Opreation { kind, subterms } => 
@@ -125,7 +129,7 @@ impl<'a> Lowering<'a>{
     }
 
     /// Converts operation kind into smt representation
-    pub fn lower_operation_kind(&mut self, kind: &OperationKind, subterms: &Vec<Operation>, var_map: &'a HashMap<Variable, Int<'a>>) -> Result<Dynamic<'a>,Error>{
+    pub fn lower_operation_kind(&mut self, kind: &OperationKind, subterms: &Vec<Operation>, var_map: &HashMap<Variable, Int<'a>>) -> Result<Dynamic<'a>,Error>{
 
         // expect to only have two subterms
         let left = self.lower_operation(subterms.first().expect("invalid program component"), var_map)?;
@@ -134,40 +138,44 @@ impl<'a> Lowering<'a>{
         match kind{
             OperationKind::Equal => Ok(left._eq(right).into_dynamic()),
             OperationKind::Unequals => Ok(left._neq(right).into_dynamic()),
-            OperationKind::NumericSum => Ok(left.as_int()?.add(right.as_int()?).into()),
-            OperationKind::NumericSubtraction => Ok(left.as_int()?.sub(right.as_int()?).into()),
-            OperationKind::NumericProduct => Ok(left.as_int()?.mul(right.as_int()?).into()),
-            OperationKind::NumericDivision => Ok((left.as_int()? / right.as_int()?).into()),
-            OperationKind::NumericGreaterthaneq => Ok(left.as_int()?.ge(right.as_int()?).into()),
-            OperationKind::NumericGreaterthan => Ok(left.as_int()?.gt(right.as_int()?).into()),
-            OperationKind::NumericLessthaneq => Ok(left.as_int()?.le(right.as_int()?).into()),
-            OperationKind::NumericLessthan => Ok(left.as_int()?.lt(right.as_int()?).into()),
+            OperationKind::NumericSum => Ok(left.as_int()?.add(right.as_int()?).into_dynamic()),
+            OperationKind::NumericSubtraction => Ok(left.as_int()?.sub(right.as_int()?).into_dynamic()),
+            OperationKind::NumericProduct => Ok(left.as_int()?.mul(right.as_int()?).into_dynamic()),
+            OperationKind::NumericDivision => Ok((left.as_int()? / right.as_int()?).into_dynamic()),
+            OperationKind::NumericGreaterthaneq => Ok(left.as_int()?.ge(right.as_int()?).into_dynamic()),
+            OperationKind::NumericGreaterthan => Ok(left.as_int()?.gt(right.as_int()?).into_dynamic()),
+            OperationKind::NumericLessthaneq => Ok(left.as_int()?.le(right.as_int()?).into_dynamic()),
+            OperationKind::NumericLessthan => Ok(left.as_int()?.lt(right.as_int()?).into_dynamic()),
             _ => panic!("other operations not supported for now")
+        }
+    }
+
+    /// Lowers the restrictions on the frontier variables to the solver
+    pub fn lower_restrictions(&self, restrictions: &HashMap<Variable, Range<i32>>, var_map: &HashMap<Variable, Int<'a>>, solver: &mut Solver<'a , Z3Binary>){
+        for (var, range) in restrictions{
+            if let Some(int_var) = var_map.get(var){
+                let lower_bound = Int::new(self.st, range.start as i64);
+                let upper_bound = Int::new(self.st, range.end as i64);
+
+                // Assert the variable is within the bounds
+                solver.assert(int_var.ge(lower_bound)).expect("failed asserting lower bound");
+                solver.assert(int_var.lt(upper_bound)).expect("failed asserting upper bound");
+            }
         }
     }
 
     /// Generates Smtlib code for rule
     pub fn lower_rule(
-        &'a mut self, 
+        &mut self, 
         rule: &NormalizedRule, 
-        var_map: &'a mut HashMap<Variable, Int<'a>>, 
+        var_map: &'a HashMap<Variable, Int<'a>>, 
         solver: &mut Solver<'a , Z3Binary> ,
     ) -> Result<(),Error>{
-
-        // Build the vars, could be converted to iterator and so on TODO: use the new function
-        for var in rule.variables(){
-            if let Some(name) = var.name(){
-                var_map
-                    .entry(var.clone())
-                    .or_insert(*Int::new_const(self.st, name));
-            }
-        }
 
         let body_atoms = rule.positive().iter()
             .map(|atom| self.lower_body_atom(atom, var_map).expect("failed in lower rule"));
 
         for atom in body_atoms{
-            println!("{atom}");
             solver.assert(atom).expect("failed in asserting atom");
         }
 
@@ -175,8 +183,7 @@ impl<'a> Lowering<'a>{
             .map(|op| self.lower_operation(op, var_map).expect("should work").as_bool().expect("please please please"));
 
         for op in body_operations{
-            println!("op");
-            solver.assert(op).expect("failed in asserting op")
+            solver.assert(op).expect("failed in asserting op");
         }
 
         // might not be necessary
@@ -185,38 +192,116 @@ impl<'a> Lowering<'a>{
             .collect();*/
 
         for annotation in rule.annotations(){
-            let low_ann = self.lower_rule_annotation(annotation, var_map);
-            for ann in low_ann{
-                println!("{ann}");
+            let lowered_ann = self.lower_rule_annotation(annotation, var_map);
+            for ann in lowered_ann{
                 solver.assert(ann).expect("failed asserting an annotation");
             }
         }
         Ok(())
     }
+}
 
+impl<'a> Lowering<'a>{
     /// Checks whether the given rule is satisfiable with the given annotations TODO: add current range restriction
-    pub fn check_rule(rule: &NormalizedRule) -> Result<bool, Error>{
+    pub fn check_rule(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i32>>) -> Result<bool, Error>{
         let st = Storage::new();
         let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
-        let mut vars = HashMap::<Variable, Int<'a>>::new();
 
+       
         let mut lowering = Lowering::new(&st);
+        
+        let mut var_map = HashMap::<Variable, Int<'a>>::new();
 
-        for (predicate, arity) in rule.predicates(){
+        // Build the vars, could be converted to iterator and so on TODO: use the new function
+        for var in rule.variables(){
+            if let Some(name) = var.name(){
+                var_map.insert(var.clone(), *Int::new_const(&st, name));
+            }
+        }
+
+        // Generate the smt representation for all predicates in the rule
+        let predicate_set: HashSet<(Tag, usize)> = rule.predicates().collect(); 
+        for (predicate, arity) in predicate_set{
             lowering.build_predicate(predicate, arity, &mut solver).expect("failed to build predicate");
         }
 
-        lowering.lower_rule(rule, &mut vars, &mut solver)?;
+        lowering.lower_restrictions(restrictions, &var_map, &mut solver);
+
+        lowering.lower_rule(rule, &var_map, &mut solver)?;
+                
         
         
         // TODO: should probably check whether there exists a model not satisfying the annotations
+        // What I mean by this -> There should be a seperate check to see whether the annotations are actually
+        // "satisfied", e.g. for recursion "invariants" that they hold
         let result = solver.check_sat_with_model()?;
         match result{
-            SatResultWithModel::Unsat => println!("Unsat"),
-            SatResultWithModel::Sat(model) => println!("Result: {model}"),
-            SatResultWithModel::Unknown => println!("Unknown"),
+            SatResultWithModel::Unsat => {println!("UnSAT"); Ok(false)},
+            SatResultWithModel::Sat(model) => {println!("SAT: {model}"); Ok(true)},
+            SatResultWithModel::Unknown => {println!("Unknown"); Ok(false)},
         }
-        Ok(true)
+    }
+
+    /// Get the minimum & maximum of the frontier variables
+    pub fn get_frontier_range(
+        restrictions: &HashMap<Variable, Range<i32>>, 
+        annotation_ops: &Vec<Operation>,
+        body_ops: &Vec<Operation>,
+        head_vars: &HashSet<Variable>,
+        vars: Vec<&Variable>
+    ) -> Result<(),Error>{
+
+        println!("getting frontier range");
+        let st = Storage::new();
+        let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
+
+        // TODO: set logic to some sort of LIA or so
+        //solver.set_logic(Logi)
+
+        solver.set_logger((
+        |cmd: Command<'_>| println!("> {cmd}"),
+        |_cmd: Command<'_>, res: &str| println!("=> {}", res.trim_end()),
+        ));
+
+        let mut lowering = Lowering::new(&st);
+        
+        let mut var_map = HashMap::<Variable, Int<'a>>::new();
+
+        // Build the vars, could be converted to iterator and so on TODO: use the new function
+        for var in vars{
+            if let Some(name) = var.name(){
+                var_map.insert(var.clone(), *Int::new_const(&st, name));
+            }
+        }
+       
+        // Lower the restrictions
+        lowering.lower_restrictions(restrictions, &var_map, &mut solver);
+
+        // Lower the annotation ops
+        for operation in annotation_ops{
+            solver.assert(lowering.lower_operation(operation, &var_map)?.as_bool()?).expect("failed to assert op");
+        }
+
+        // Lower body operations
+        for operation in body_ops{
+            solver.assert(lowering.lower_operation(operation, &var_map)?.as_bool()?).expect("failed to assert op");
+        }
+
+        for var in head_vars{
+            // TODO: fr
+            let var_const = var_map.get(var).expect("var should be registered");
+            solver.minimize(*var_const)?;
+        }
+
+        let _result = solver.check_sat()?;
+
+        for var in head_vars{
+            let var_term = var_map.get(var).expect("var should be registered");
+            let result = solver.eval(*var_term)?;
+            println!("{result}");
+        }
+
+        Ok(())
     }
                 
 }

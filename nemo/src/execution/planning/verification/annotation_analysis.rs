@@ -79,12 +79,12 @@ impl AnnotationAnalyzer{
     }
 
     /// Gets the restrictions on the frontier variables based on previous restrictions in the body
-    pub fn frontier_var_restrictions(
+    pub fn rule_var_restrictions(
         &self,
         rule: &NormalizedRule,
         variable_restrictions: &mut HashMap<Variable, Range<i32>>
     ){
-        let frontier = rule.frontier();
+        let rule_vars = rule.variables().collect::<HashSet<_>>();
         for atom in rule.positive(){
             let predicate = (atom.predicate(), atom.arity());
 
@@ -93,7 +93,7 @@ impl AnnotationAnalyzer{
                 // All predicate positions in the body atom that contain a frontier var
                 let frontier_pos = atom.terms()
                 .enumerate()
-                .filter(|(_, var)| frontier.contains(var));
+                .filter(|(_, var)| rule_vars.contains(var));
 
                 // Intersect the existing restriction on the variables with the body restrictions
                 for (pos, var) in frontier_pos{
@@ -119,10 +119,6 @@ impl AnnotationAnalyzer{
         }
     }
 
-    /// Verifies whether the rule annotation matches the current annotations
-    pub fn verify_rule_annotation() -> bool{
-        true
-    }
 
     /// Verifies whether the global annotation holds given the current restrictions
     pub fn verify_global_annotation(&self, annotation :&NormalizedGlobalAnnotation) -> bool{
@@ -178,7 +174,7 @@ impl AnnotationAnalyzer{
         for fact in self.program.facts(){
             if let Some(restriction) = self.unary_restrictions.get(&(fact.predicate(), fact.arity())){
                 if !restriction.verify_ground_atom(fact){
-                    println!("The fact {} cannot satisfy its restrictions.", fact)
+                    println!("The fact {} doesn't satisfy its restrictions.", fact)
                 }
                 print!("Ranges of {}: ", fact.predicate());
                 println!("{}", restriction);
@@ -186,8 +182,8 @@ impl AnnotationAnalyzer{
         }
 
         // Iterate over the loops while something changes
-        // TODO: support for rule annotations
         // TODO: probably move this to its own method
+        // support using horn rules or smth for e.g ?Y = ?X +1
         // TODO: don't propagate if the some range is already empty
         let mut delta = true;
         while delta{
@@ -195,48 +191,64 @@ impl AnnotationAnalyzer{
 
             for rule in self.program.rules(){
                 
-                // Ranges of the frontier variables
                 let mut variable_restrictions: HashMap<Variable, Range<i32>> = HashMap::<Variable, Range<i32>>::default();
+                // TODO: move this into rule_var restrictions and return, this doesn't need to be mut otherwise
+                //Restrictions on the variables in the rule at current iteration
+                self.rule_var_restrictions(rule, &mut variable_restrictions);
 
-                self.frontier_var_restrictions(rule, &mut variable_restrictions);
-
-                
-                for rule_annotation in rule.annotations(){
-                    let _ = Lowering::check_rule(rule);
+                let sat = Lowering::check_rule(rule, &variable_restrictions).expect("smt call didn't work");
                     /* idea:
                     * Generate The formulas from the rule annotation
                     * Check whether these match with the variable restrictions
                     * If yes: propagate the extra restrictions (intersection based)
                     * If no: Assume the rule cannot fire and skip propagating to the head
                      */
-                }
+                // TODO: just to test, change to actually collecting all
+                let annotation_ops = rule.annotations().iter()
+                    .flat_map(|ann| ann.body())
+                    .map(|op| op.clone())
+                    .collect();
+
+                let vars: Vec<&Variable> = rule.variables().collect();
+                
+                let head_vars: HashSet<Variable> = rule.head().iter()
+                    .flat_map(|head| head.variables())
+                    .map(|var| var.clone())
+                    .collect();
+
+                // TODO: restrict only to vars that occur in arithmetic predicates,
+                // the rest can be optimized much cheaper than with smt call
+                let foo = Lowering::get_frontier_range(&variable_restrictions, &annotation_ops, rule.operations(), &head_vars, vars);
 
                 // Make actual head pred restrictions from variable restrictions,TODO: maybe add restriction for ground terms?
-                for head_atom in rule.head(){
-                    let head_predicate = (head_atom.predicate(), head_atom.arity());
+                if sat{
+                    for head_atom in rule.head(){
+                        let head_predicate = (head_atom.predicate(), head_atom.arity());
 
-                    let var_pos_in_head = 
-                        head_atom.terms().enumerate()
-                        .filter_map(|(pos, var)| {
-                            match var{
-                                Primitive::Variable(variable) => Some((pos,variable)),
-                                Primitive::Ground(_) => None,
-                            }
-                        });
-                    
-                    // The previous restriction on the head predicate
-                    let head_range_res = self.unary_restrictions
-                        .entry(head_predicate)
-                        .or_insert(RangeRestriction::new());
+                        let var_pos_in_head = 
+                            head_atom.terms().enumerate()
+                            .filter_map(|(pos, var)| {
+                                match var{
+                                    Primitive::Variable(variable) => Some((pos,variable)),
+                                    Primitive::Ground(_) => None,
+                                }
+                            });
+                        
+                        // The previous restriction on the head predicate
+                        let head_range_res = self.unary_restrictions
+                            .entry(head_predicate)
+                            .or_insert(RangeRestriction::new());
 
-                    // Update the ranges TODO: should this maybe be completely moved into range_union?
-                    for (pos, var) in var_pos_in_head{
-                        if let Some(new_range) = variable_restrictions.get(var){
-                            delta = head_range_res.range_union(pos, new_range) || delta;
-                        } 
-                        // TODO: maybe check if it matches the assert here already?
+                        // Update the ranges TODO: should this maybe be completely moved into range_union?
+                        for (pos, var) in var_pos_in_head{
+                            if let Some(new_range) = variable_restrictions.get(var){
+                                delta = head_range_res.range_union(pos, new_range) || delta;
+                            } 
+                            // TODO: maybe check if it matches the assert here already?
+                        }
                     }
                 }
+                
             }
         }
 
