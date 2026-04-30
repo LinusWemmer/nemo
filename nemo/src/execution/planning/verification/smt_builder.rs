@@ -206,18 +206,9 @@ impl<'a> Lowering<'a>{
     pub fn check_rule(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i64>>) -> Result<bool, Error>{
         let st = Storage::new();
         let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
-
-       
         let mut lowering = Lowering::new(&st);
         
-        let mut var_map = HashMap::<Variable, Int<'a>>::new();
-
-        // Build the vars, could be converted to iterator and so on TODO: use the new function
-        for var in rule.variables(){
-            if let Some(name) = var.name(){
-                var_map.insert(var.clone(), *Int::new_const(&st, name));
-            }
-        }
+        let var_map = lowering.build_var_map(&rule.variables().collect());
 
         // Generate the smt representation for all predicates in the rule
         let predicate_set: HashSet<(Tag, usize)> = rule.predicates().collect(); 
@@ -228,9 +219,7 @@ impl<'a> Lowering<'a>{
         lowering.lower_restrictions(restrictions, &var_map, &mut solver);
 
         lowering.lower_rule(rule, &var_map, &mut solver)?;
-                
-        
-        
+                       
         // TODO: should probably check whether there exists a model not satisfying the annotations
         // What I mean by this -> There should be a seperate check to see whether the annotations are actually
         // "satisfied", e.g. for recursion "invariants" that they hold
@@ -242,20 +231,47 @@ impl<'a> Lowering<'a>{
         }
     }
 
+    /// Builds a map of nemo variables to their smt represenation (TODO: make this take an iterator over vars)
+    pub fn build_var_map(&self, vars: &Vec<&Variable>) -> HashMap<Variable, Int<'a>>
+    where {
+        let mut var_map = HashMap::<Variable, Int<'a>>::new();
+        for var in vars{
+            if let Some(name) = var.name(){
+                var_map.insert((*var).clone(), *Int::new_const(self.st, name));
+            }
+        }
+        var_map
+    }
+
+    /// Checks whether the rule annotatioins are actually satisfied (assert at least)
+    pub fn check_rule_annotation(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i64>>) -> Result<bool,Error>{
+        let st = Storage::new();
+        let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
+        let mut lowering = Lowering::new(&st);
+
+        let var_map = lowering.build_var_map(&rule.variables().collect());
+
+        // Generate the smt representation for all predicates in the rule
+        let predicate_set: HashSet<(Tag, usize)> = rule.predicates().collect(); 
+        for (predicate, arity) in predicate_set{
+            lowering.build_predicate(predicate, arity, &mut solver).expect("failed to build predicate");
+        }
+
+        Ok(true)
+    }
+
     /// Get the minimum & maximum of the frontier variables
     pub fn get_head_var_range(
         restrictions: &HashMap<Variable, Range<i64>>, 
         annotation_ops: &Vec<Operation>,
         body_ops: &Vec<Operation>,
-        head_vars: &HashSet<Variable>,
+        arith_head_vars: &HashSet<Variable>,
         rule_vars: Vec<&Variable>
     ) -> Result<HashMap<Variable, Range<i64>>,Error>{
         let st = Storage::new();
         let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
-
         // TODO: set logic to some sort of LIA or so
         //solver.set_logic(Logi)
-
         let mut lowering = Lowering::new(&st);
         
         let mut var_map = HashMap::<Variable, Int<'a>>::new();
@@ -281,46 +297,38 @@ impl<'a> Lowering<'a>{
         }
         
         // TODO: should actually be done for each variable individually
-        let min_values = solver.scope(|solver|{
-            for var in head_vars{
+        let mut min_values= HashMap::<Variable, i64>::new();
+        for var in arith_head_vars{
+            let min = solver.scope(|solver|{
                 let var_const = var_map.get(var).expect("var should be registered");
                 solver.minimize(*var_const)?;
-            }
-            solver.check_sat()?;
+                solver.check_sat()?;
 
-            let mut result= HashMap::<Variable, i64>::new();
-            for var in head_vars{
-                let var_term: &Int<'_> = var_map.get(var).expect("var should be registered");
-                let value: i64 = solver.eval(*var_term)?.try_into().expect("should return value");
-                result.insert(var.clone(), value);
-            }
-            
-            Ok(result)
-        })?;
-
-        let max_values = solver.scope(|solver|{
-            for var in head_vars{
+                let min_value: i64 = solver.eval(*var_const)?.try_into().expect("should return value");
+                Ok(min_value)
+            })?;
+            min_values.insert(var.clone(),min);
+        }
+        
+        let mut max_values= HashMap::<Variable, i64>::new();
+        for var in arith_head_vars{
+            let max = solver.scope(|solver|{
                 let var_const = var_map.get(var).expect("var should be registered");
                 solver.maximize(*var_const)?;
-            }
-            solver.check_sat()?;
+                solver.check_sat()?;
 
-            let mut result= HashMap::<Variable, i64>::new();
-            for var in head_vars{
-                let var_term: &Int<'_> = var_map.get(var).expect("var should be registered");
-                let value: i64 = solver.eval(*var_term)?.try_into().expect("should return value");
-                result.insert(var.clone(), value);
-            }
-            
-            Ok(result)
-        })?;
+                let min_value: i64 = solver.eval(*var_const)?.try_into().expect("should return value");
+                Ok(min_value)
+            })?;
+            max_values.insert(var.clone(),max);
+        }
         
         // Generate range from min, max
         let mut var_range = HashMap::<Variable, Range<i64>>::new();
-        for var in head_vars{
+        for var in arith_head_vars{
             let min = *min_values.get(var).expect("min value should be there");
             let max = *max_values.get(var).expect("max value should be there");
-            var_range.insert(var.clone(), min..max);
+            var_range.insert(var.clone(), min..max+1);
         }
 
         Ok(var_range)
