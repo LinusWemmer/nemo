@@ -3,6 +3,7 @@
 
 use core::ops::Range;
 use std::collections::{HashMap, HashSet};
+use std::i64;
 use std::ops::{Add, Mul, Sub};
 
 use smtlib::{
@@ -243,7 +244,7 @@ impl<'a> Lowering<'a>{
         var_map
     }
 
-    /// Checks whether the rule annotatioins are actually satisfied (assert at least)
+    /// Checks whether the rule annotatioins are actually satisfied (assert at least)(TODO)
     pub fn check_rule_annotation(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i64>>) -> Result<bool,Error>{
         let st = Storage::new();
         let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
@@ -296,7 +297,6 @@ impl<'a> Lowering<'a>{
             solver.assert(lowering.lower_operation(operation, &var_map)?.as_bool()?).expect("failed to assert op");
         }
         
-        // TODO: should actually be done for each variable individually
         let mut min_values= HashMap::<Variable, i64>::new();
         for var in arith_head_vars{
             let min = solver.scope(|solver|{
@@ -304,7 +304,7 @@ impl<'a> Lowering<'a>{
                 solver.minimize(*var_const)?;
                 solver.check_sat()?;
 
-                let min_value: i64 = solver.eval(*var_const)?.try_into().expect("should return value");
+                let min_value: i64 = solver.eval(*var_const)?.try_into().unwrap_or(i64::MIN);
                 Ok(min_value)
             })?;
             min_values.insert(var.clone(),min);
@@ -317,8 +317,9 @@ impl<'a> Lowering<'a>{
                 solver.maximize(*var_const)?;
                 solver.check_sat()?;
 
-                let min_value: i64 = solver.eval(*var_const)?.try_into().expect("should return value");
-                Ok(min_value)
+                let max_value: i64 = solver.eval(*var_const)?.try_into().unwrap_or(i64::MAX);
+                println!("max value");
+                Ok(max_value)
             })?;
             max_values.insert(var.clone(),max);
         }
