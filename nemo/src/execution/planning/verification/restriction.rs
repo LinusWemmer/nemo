@@ -160,16 +160,16 @@ impl RangeRestriction {
     }
 
     /// Returns true if the Ground atom satisfies the constraint, false otherwise
-    pub fn verify_ground_atom(&self, atom: &GroundAtom) -> bool {
+    pub fn verify_ground_atom(&self, atom: &GroundAtom) -> Result<(),()> {
         for (position, ground_term) in atom.terms().enumerate(){
             if let Some(range) = self.range_res().get(&position){
                 let data_value: i64 = ground_term.value().to_i64_unchecked();
                 if !range.contains(&data_value){
-                    return false;
+                    return Err(());
                 }
             }
         }
-        true
+        Ok(())
     }
 
     /// Checks whether the second range restriction completely fits inside the first

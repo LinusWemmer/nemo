@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::i64;
 use std::ops::{Add, Mul, Sub};
 
+use smtlib::{and, terms};
 use smtlib::{
     Error,
     funs::Fun,
@@ -192,6 +193,8 @@ impl<'a> Lowering<'a>{
             .map(|atom| self.lower_head_atom(atom, var_map).expect("failed in lower rule"))
             .collect();*/
 
+        // The negation of the conjunction of all of these has to be asserted, as we want to check whether the 
+        // assertion are satisfied
         for annotation in rule.annotations(){
             let lowered_ann = self.lower_rule_annotation(annotation, var_map);
             for ann in lowered_ann{
@@ -217,18 +220,18 @@ impl<'a> Lowering<'a>{
             lowering.build_predicate(predicate, arity, &mut solver).expect("failed to build predicate");
         }
 
-        lowering.lower_restrictions(restrictions, &var_map, &mut solver);
-
         lowering.lower_rule(rule, &var_map, &mut solver)?;
+
+        lowering.lower_restrictions(restrictions, &var_map, &mut solver);
                        
         // TODO: should probably check whether there exists a model not satisfying the annotations
         // What I mean by this -> There should be a seperate check to see whether the annotations are actually
         // "satisfied", e.g. for recursion "invariants" that they hold
         let result = solver.check_sat()?;
         match result{
-            SatResult::Unsat => {println!("Unsat"); Ok(false)},
-            SatResult::Sat => {println!("Sat"); Ok(true)},
-            SatResult::Unknown => {println!("Unknown"); Ok(false)},
+            SatResult::Unsat => {Ok(false)},
+            SatResult::Sat => {Ok(true)},
+            SatResult::Unknown => {Ok(false)},
         }
     }
 
@@ -318,7 +321,6 @@ impl<'a> Lowering<'a>{
                 solver.check_sat()?;
 
                 let max_value: i64 = solver.eval(*var_const)?.try_into().unwrap_or(i64::MAX);
-                println!("max value");
                 Ok(max_value)
             })?;
             max_values.insert(var.clone(),max);
