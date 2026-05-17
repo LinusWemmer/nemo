@@ -59,6 +59,7 @@ orx-imp-vec = "2.14"
 itertools = "0.14.0"
 indexmap = "2.10.0"
 smtlib = { git = "https://github.com/oeb25/smtlib-rs", package = "smtlib" }
+z3 = "0.20.0"
 
 [dev-dependencies]
 env_logger = "*"

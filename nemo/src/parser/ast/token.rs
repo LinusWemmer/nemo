@@ -31,7 +31,7 @@ use crate::{
         datavalues::{self, RDF_DATATYPE_INDICATOR, boolean, iri, map, string, tuple},
         directive, encoding_prefixes,
         expression::{aggregate, atom, format_string, operation, variable},
-        operator, rule, rule_annotation, annotation_global
+        operator, rule, rule_annotation, annotation_global, type_annotation
     },
 };
 
@@ -303,8 +303,20 @@ pub enum TokenKind {
     #[assoc(name = rule_annotation::CLOSE_RULE_ANNOTATION)]
     CloseRuleAnnotation,
     /// Open assert annotation
-    #[assoc(name= annotation_global::OPEN_ASSERT)]
+    #[assoc(name = annotation_global::OPEN_ASSERT)]
     OpenAssert,
+    /// Open type annotation
+    #[assoc(name = type_annotation::OPEN_TYPE)] 
+    OpenType,
+    /// Indicate Integer Type 
+    #[assoc(name = type_annotation::TYPE_INDICATOR_INT)]
+    TypeIndicatorInt,
+    /// Indicate Integer Type 
+    #[assoc(name = type_annotation::TYPE_INDICATOR_FLOAT)]
+    TypeIndicatorFloat,
+    /// Indicate Integer Type 
+    #[assoc(name = type_annotation::TYPE_INDICATOR_STRING)]
+    TypeIndicatorString,
     /// Annotation Seperator
     #[assoc(name= annotation_global::ANNOTATION_SEPERATOR)]
     AnnotationSeperator,
@@ -871,6 +883,7 @@ impl<'a> Token<'a> {
     string_token!(close_attribute, TokenKind::CloseAttribute);
     string_token!(open_rule_annotation, TokenKind::OpenRuleAnnotation);
     string_token!(close_rule_annotation, TokenKind::CloseRuleAnnotation);
+    string_token!(open_type_annotation, TokenKind::OpenType);
     string_token!(open_assert, TokenKind::OpenAssert);
     string_token!(annotation_seperator, TokenKind::AnnotationSeperator);
     string_token!(rule_arrow, TokenKind::RuleArrow);
@@ -879,6 +892,9 @@ impl<'a> Token<'a> {
     string_token!(global_indicator, TokenKind::GlobalIndicator);
     string_token!(lang_tag_indicator, TokenKind::LangTagIndicator);
     string_token!(name_datatype_separator, TokenKind::NameDatatypeSeparator);
+    string_token!(type_indicator_int, TokenKind::TypeIndicatorInt);
+    string_token!(type_indicator_float, TokenKind::TypeIndicatorFloat);
+    string_token!(type_indicator_strig, TokenKind::TypeIndicatorString);
 }
 
 #[cfg(test)]

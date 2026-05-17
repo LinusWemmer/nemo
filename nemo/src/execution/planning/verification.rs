@@ -3,3 +3,4 @@
 pub mod annotation_analysis;
 pub mod restriction;
 pub mod smt_builder;
+pub mod completion;

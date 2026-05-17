@@ -9,6 +9,7 @@ pub(crate) mod literal;
 pub(crate) mod rule;
 pub(crate) mod global_annotation;
 pub(crate) mod rule_annotation;
+pub(crate) mod type_annotation;
 mod term;
 
 use std::{collections::HashMap, fmt::{Debug, Display}, ops::Range};
@@ -31,7 +32,14 @@ use crate::{
 };
 
 use super::{
-    components::{fact::Fact, rule::Rule, term::Term, global_annotation::GlobalAnnotation, rule_annotation::RuleAnnotation},
+    components::{
+        fact::Fact,
+        rule::Rule, 
+        term::Term, 
+        global_annotation::GlobalAnnotation, 
+        rule_annotation::RuleAnnotation,
+        type_annotation::TypeAnnotation,
+    },
     error::{TranslationReport, translation_error::TranslationError},
 };
 
@@ -127,7 +135,6 @@ impl ASTProgramTranslation {
                 }
                 ast::statement::StatementKind::Rule(rule) => {
                     if let Some(rule) = Rule::build_component(&mut self, rule) {
-                        //WIP: think about data structure to map rule annotation to rule, without putting the annotations in the rule
                         program.add_rule(rule);
                     }
                 }
@@ -139,6 +146,11 @@ impl ASTProgramTranslation {
                         program.add_global_annotation(global_annotation);
                     }
                 },
+                ast::statement::StatementKind::TypeAnnotation(type_annotation) =>{
+                    if let Some(type_annotation) = TypeAnnotation::build_component(&mut self, type_annotation){
+                        ();//program.add_type_annotation(type_annotation);
+                    }
+                }
                 ast::statement::StatementKind::Error(_token) => {
                     panic!(
                         "Faulty statement should result in a parser error and not be propagated."

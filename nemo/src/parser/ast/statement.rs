@@ -9,7 +9,6 @@ use nom::{
 
 use crate::parser::{
     ParserResult,
-    ast::rule_annotation::RuleAnnotation,
     context::{ParserContext, context},
     input::ParserInput,
     span::Span,
@@ -23,7 +22,9 @@ use super::{
     guard::Guard,
     rule::Rule,
     token::Token,
+    rule_annotation::RuleAnnotation,
     global_annotation::GlobalAnnotation,
+    type_annotation::TypeAnnotation
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -40,6 +41,8 @@ pub enum StatementKind<'a> {
     Error(Token<'a>),
     /// Global Annotation
     GlobalAnnotation(GlobalAnnotation<'a>),
+    /// Type Annotation
+    TypeAnnotation(TypeAnnotation<'a>),
 }
 
 impl<'a> StatementKind<'a> {
@@ -50,6 +53,7 @@ impl<'a> StatementKind<'a> {
             StatementKind::Rule(statement) => statement.context(),
             StatementKind::Directive(statement) => statement.context(),
             StatementKind::GlobalAnnotation(statement) => statement.context(),
+            StatementKind::TypeAnnotation(statement) => statement.context(),
             StatementKind::Error(_statement) => ParserContext::Error,
             
         }
@@ -118,6 +122,7 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
             StatementKind::Rule(statement) => vec![statement],
             StatementKind::Directive(statement) => vec![statement],
             StatementKind::GlobalAnnotation(statement) => vec![statement],
+            StatementKind::TypeAnnotation(statement) => vec![statement],
             StatementKind::Error(_) => vec![],
         }
     }

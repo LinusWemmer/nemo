@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::i64;
 use std::ops::{Add, Mul, Sub};
 
-use smtlib::{and, terms};
+
 use smtlib::{
     Error,
     funs::Fun,
@@ -248,7 +248,7 @@ impl<'a> Lowering<'a>{
     }
 
     /// Checks whether the rule annotatioins are actually satisfied (assert at least)(TODO)
-    pub fn check_rule_annotation(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i64>>) -> Result<bool,Error>{
+    /*pub fn check_rule_annotation(rule: &NormalizedRule, restrictions: &HashMap<Variable, Range<i64>>) -> Result<bool,Error>{
         let st = Storage::new();
         let mut solver: Solver<'_, Z3Binary> = Solver::new(&st, Z3Binary::new("/usr/bin/z3").expect("bla")).expect("f");
         let mut lowering = Lowering::new(&st);
@@ -262,7 +262,7 @@ impl<'a> Lowering<'a>{
         }
 
         Ok(true)
-    }
+    }*/
 
     /// Get the minimum & maximum of the frontier variables
     pub fn get_head_var_range(

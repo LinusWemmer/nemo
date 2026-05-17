@@ -3,6 +3,7 @@
 pub mod attribute;
 pub mod rule_annotation;
 pub mod global_annotation;
+pub mod type_annotation;
 pub mod comment;
 pub mod directive;
 pub mod expression;

@@ -2,6 +2,7 @@
 
 use std::fmt::Display;
 
+/// Describes the type of error occuring during type analysis
 #[derive(Debug, Copy, Clone)]
 pub enum AnalysisErrorKind {
     GlobalAssertFactMismatch,

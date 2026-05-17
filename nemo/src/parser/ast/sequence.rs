@@ -4,6 +4,7 @@ pub mod declare;
 pub mod key_value;
 pub mod one;
 pub mod simple;
+pub mod type_lit;
 
 use std::vec::IntoIter;
 

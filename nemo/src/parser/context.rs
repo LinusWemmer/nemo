@@ -178,6 +178,9 @@ pub enum ParserContext {
     /// Global Annotation
     #[assoc(name = "global annotation")]
     GlobalAnnotation,
+    /// Type Annotation
+    #[assoc(name = "type annotation")]
+    TypeAnnotation,
 }
 
 impl ParserContext {

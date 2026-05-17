@@ -106,6 +106,20 @@ pub mod annotation_global {
 
 }
 
+pub mod type_annotation {
+    //! This module contains syntax definitions for type annotations/declarations.
+    
+    /// opening token type assertion:
+    pub const OPEN_TYPE: &str = "#type";
+
+    /// Mark as int:
+    pub const TYPE_INDICATOR_INT: &str = "int";
+    /// Mark as float:
+    pub const TYPE_INDICATOR_FLOAT: &str = "float";
+    /// Mark as string:
+    pub const TYPE_INDICATOR_STRING: &str = "str";
+}
+
 pub mod fact {
     //! This module contains the syntax definitions for facts.
 }
