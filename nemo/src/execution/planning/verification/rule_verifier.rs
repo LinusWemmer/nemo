@@ -1,8 +1,10 @@
-//! Gernerates the completion of a program
+//! Gernerates the RuleVerifier of a program
 
 use std::collections::HashMap;
 
+use crate::execution::planning::normalization::global_annotation::NormalizedGlobalAnnotation;
 use crate::nemo_physical::datavalues::DataValue;
+
 use crate::{
     execution::planning::normalization::{
         atom::{body::BodyAtom, head::HeadAtom},
@@ -16,19 +18,25 @@ use crate::{
     },
 };
 
-use z3::Fixedpoint;
+use z3::Solver;
 use z3::{
     self, FuncDecl, Sort,
     ast::{Ast, Bool, Dynamic, Int},
 };
 
-/// Struct for converting Nemo program to FO Theories
+/// Struct for converting rules
 #[derive(Debug, Copy, Clone)]
-pub struct Completion {
+pub struct RuleVerifier {
     fresh_var_counter: usize,
 }
 
-impl Completion {
+impl RuleVerifier {
+    /// Creates a new [RuleVerifier]
+    pub fn new() -> Self {
+        Self {
+            fresh_var_counter: 0,
+        }
+    }
     /// Generates a new var for the program
     pub fn get_fresh_var(&mut self) -> String {
         self.fresh_var_counter += 1;
@@ -159,7 +167,140 @@ impl Completion {
         &self,
         rule: &NormalizedRule,
         predicate_to_z3_fun: &HashMap<Tag, FuncDecl>,
+        var_cache: &HashMap<Variable, Int>,
+        program: &NormalizedProgram,
     ) -> Vec<Bool> {
+        let mut body_terms = Vec::new();
+        for atom in rule.positive() {
+            let smt_atom = self.translate_body_atom(atom, &var_cache, predicate_to_z3_fun);
+            body_terms.push(smt_atom);
+
+            body_terms.extend(
+                program
+                    .predicate_to_global_annotation(&atom.predicate())
+                    .iter()
+                    .map(|a| self.translate_body_assertion(a, atom, var_cache)),
+            );
+        }
+
+        //TODO: gather possible propagated restrictions (each instance should be an conjunction, and disjunt all of them)
+        // test if this is computationally feasable
+        let body_operations = rule.operations().iter().map(|b| {
+            self.translate_operation(b, &var_cache)
+                .as_bool()
+                .expect("Top level operations should have Sort Bool")
+        });
+
+        body_terms.extend(body_operations);
+
+        // TODO: maybe move the ground to the body somehow, support rules with only one head maybe?
+        // Build the rules
+        /*rule.head()
+        .iter()
+        .map(|h| self.translate_head_atom(h, &var_cache, predicate_to_z3_fun))
+        .map(|h| h.implies(&body))
+        .collect();*/
+        body_terms
+    }
+
+    /// Translates the global assertion body
+    /// TODO: add predicate
+    /// Maybe the varcache has to use a hashset as basis?
+    pub fn translate_body_assertion(
+        &self,
+        assertion: &NormalizedGlobalAnnotation,
+        rule_predicate: &BodyAtom,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Bool {
+        // define the variable substitution: TODO: turn these into
+        let substitution = rule_predicate.terms().zip(assertion.variables());
+
+        // This sort of defines a "substitution"
+        // This is only possible if all variables in the assertion head are different
+        let var_sub: HashMap<Variable, Int> = substitution
+            .map(|(v_rule, v_assert)| {
+                (
+                    v_assert.clone(),
+                    //TODO: map the vars to new variables, or even better the appropriate head var
+                    var_cache
+                        .get(v_rule)
+                        .expect("Variable should be in cache")
+                        .clone(),
+                )
+            })
+            .collect();
+
+        let body_constraints: Vec<Bool> = assertion
+            .body()
+            .iter()
+            .map(|b| {
+                self.translate_operation(b, &var_sub)
+                    .as_bool()
+                    .expect("Top level operations should have Sort Bool")
+            })
+            .collect();
+        // Conjunction of constraints (as a single assertions assert all its things conjunctively)
+        Bool::and(&body_constraints)
+    }
+
+    /// Translates the assertion for the head predicate into smt representation
+    /// TODO: test with groundstuff in head
+    pub fn translate_head_assertion(
+        &self,
+        assertion: &NormalizedGlobalAnnotation,
+        head_predicate: &HeadAtom,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Bool {
+        let substitution = head_predicate.terms().zip(assertion.variables());
+
+        // Map the head atom terms to variables in the assertion body
+        // This should probably work, but could be a source of bugs
+        let prim_cache: HashMap<Variable, Int> = substitution
+            .map(|(p, v)| match p {
+                Primitive::Variable(head_var) => (
+                    v.clone(),
+                    var_cache
+                        .get(head_var)
+                        .expect("Variable should be in cache")
+                        .clone(),
+                ),
+                Primitive::Ground(ground_term) => (
+                    v.clone(),
+                    Int::from_i64(ground_term.value().to_i64_unchecked()),
+                ),
+            })
+            .collect();
+
+        let head_assertions: Vec<Bool> = assertion
+            .body()
+            .iter()
+            .map(|b| {
+                self.translate_operation(b, &prim_cache)
+                    .as_bool()
+                    .expect("Top level operations should have Sort Bool")
+            })
+            .collect();
+
+        Bool::and(&head_assertions)
+    }
+
+    /// Verifies a whether a rule satisfies it's annotations
+    /// TODO: probably change to special IH terms
+    /// body /\ assertions on body |= assertions on head
+    pub fn verify_rule(program: &NormalizedProgram, rule: &NormalizedRule) {
+        let verifier = RuleVerifier::new();
+        let solver = Solver::new();
+
+        let bool_sort = Sort::bool();
+        let int_sort = Sort::int();
+        // Register all predicates of the rule
+        let mut predicate_to_z3_fun: HashMap<Tag, FuncDecl> = HashMap::new();
+
+        for (tag, arity) in rule.predicates() {
+            let args_sort = vec![&int_sort; arity];
+            let pred = FuncDecl::new(tag.name(), &args_sort, &bool_sort);
+            predicate_to_z3_fun.insert(tag, pred);
+        }
         let var_cache: HashMap<Variable, Int> = rule
             .variables()
             .map(|v| {
@@ -170,49 +311,42 @@ impl Completion {
             })
             .collect();
 
-        let body_atoms = rule
-            .positive()
-            .iter()
-            .map(|b| self.translate_body_atom(b, &var_cache, predicate_to_z3_fun));
-
-        let body_constraints = rule.operations().iter().map(|b| {
-            self.translate_operation(b, &var_cache)
-                .as_bool()
-                .expect("Top level operations should have Sort Bool")
-        });
-
-        let body_terms: Vec<Bool> = body_atoms.chain(body_constraints).collect();
-        let body = Bool::and(&body_terms);
-
-        // TODO: maybe move the ground to the body somehow, support rules with only one head maybe?
-        // Build the rules
-        rule.head()
-            .iter()
-            .map(|h| self.translate_head_atom(h, &var_cache, predicate_to_z3_fun))
-            .map(|h| h.implies(&body))
-            .collect()
-    }
-
-    /// Translate a Datalog Program in to a set of Horn clauses
-    pub fn translate_program(&self, program: &NormalizedProgram) {
-        let fp = Fixedpoint::new();
-
-        let bool_sort = Sort::bool();
-        let int_sort = Sort::int();
-
-        // Register all predicates of the program
-        let mut predicate_to_z3_fun: HashMap<Tag, FuncDecl> = HashMap::new();
-
-        for (tag, arity) in program.predicates() {
-            let args_sort = vec![&int_sort; arity];
-            let pred = FuncDecl::new(tag.name(), &args_sort, &bool_sort);
-            fp.register_relation(&pred);
-            predicate_to_z3_fun.insert(tag, pred);
+        // Translate rule body
+        let body_instance =
+            verifier.translate_rule(rule, &predicate_to_z3_fun, &var_cache, program);
+        for term in body_instance {
+            solver.assert(term);
         }
-        for rule in program.rules() {
-            let program_rules = self.translate_rule(rule, &predicate_to_z3_fun);
-            for z3_rule in program_rules {
-                fp.add_rule(&z3_rule, Some(&format!("{}", rule.id())));
+
+        // Translate assertion for head (For now only one head predicate & only one assertion)
+        let head = &rule.head()[0];
+        let head_assertions = program.predicate_to_global_annotation(&head.predicate());
+        let head_restriction =
+            verifier.translate_head_assertion(head_assertions[0], head, &var_cache);
+        solver.assert(&head_restriction.not());
+
+        let smt = solver.to_smt2();
+        println!("{smt}");
+        match solver.check() {
+            z3::SatResult::Unsat => println!("Validated: spec holds"),
+            z3::SatResult::Unknown => println!("Could not validate (unknown)"),
+            z3::SatResult::Sat => {
+                let model = solver.get_model().expect("Sat model should exist");
+                let var_interpretation: String = head
+                    .variables()
+                    .map(|v| {
+                        let inter = model
+                            .get_const_interp(var_cache.get(v).expect("Var should be in cache"))
+                            .expect("Counterexample should exist for violation");
+                        format!("{} : {}", v, inter)
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                println!("{rule}");
+                println!(
+                    "Violation for {} found with model {}",
+                    head_assertions[0], var_interpretation
+                )
             }
         }
     }

@@ -60,6 +60,7 @@ itertools = "0.14.0"
 indexmap = "2.10.0"
 smtlib = { git = "https://github.com/oeb25/smtlib-rs", package = "smtlib" }
 z3 = "0.20.0"
+smtlib-lowlevel = "0.3.0"
 
 [dev-dependencies]
 env_logger = "*"
@@ -67,5 +68,4 @@ assert_fs = "1.0"
 test-log = "0.2"
 quickcheck = "1"
 quickcheck_macros = "1"
-tokio = { version = "1.47.1", features = [ "rt", "macros" ] }
-
+tokio = { version = "1.47.1", features = ["rt", "macros"] }
