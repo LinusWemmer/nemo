@@ -1,13 +1,17 @@
-//! Gernerates the RuleVerifier of a program
+//! Translates normalized rules into a z3 representation, defined by struct [RuleTranslator]
 
 use std::collections::HashMap;
 
-use crate::execution::planning::normalization::global_annotation::NormalizedGlobalAnnotation;
-use crate::nemo_physical::datavalues::DataValue;
+use nemo_physical::datavalues::DataValue;
+use z3::{
+    FuncDecl,
+    ast::{Ast, Bool, Dynamic, Int},
+};
 
 use crate::{
     execution::planning::normalization::{
         atom::{body::BodyAtom, head::HeadAtom},
+        global_annotation::NormalizedGlobalAnnotation,
         operation::Operation,
         program::NormalizedProgram,
         rule::NormalizedRule,
@@ -18,39 +22,35 @@ use crate::{
     },
 };
 
-use z3::Solver;
-use z3::{
-    self, FuncDecl, Sort,
-    ast::{Ast, Bool, Dynamic, Int},
-};
-
-/// Struct for converting rules
-#[derive(Debug, Copy, Clone)]
-pub struct RuleVerifier {
-    fresh_var_counter: usize,
+/// Struct for translating rules to a z3 representation for verification
+#[derive(Debug)]
+pub struct RuleTranslator {
+    /// Maps Predicate Tags to z3 function declarations
+    predicate_to_z3_fun: HashMap<Tag, FuncDecl>,
 }
 
-impl RuleVerifier {
-    /// Creates a new [RuleVerifier]
+impl RuleTranslator {
+    /// Creates a new [RuleTranslator]
     pub fn new() -> Self {
+        let predicate_to_z3_fun = HashMap::default();
         Self {
-            fresh_var_counter: 0,
+            predicate_to_z3_fun,
         }
     }
-    /// Generates a new var for the program
-    pub fn get_fresh_var(&mut self) -> String {
-        self.fresh_var_counter += 1;
-        format!("V{}", self.fresh_var_counter)
-    }
 
+    /// Creates a new rules translator with a map from predicate Tags to z3 functions
+    pub fn new_with_predicates(predicate_to_z3_fun: HashMap<Tag, FuncDecl>) -> Self {
+        Self {
+            predicate_to_z3_fun,
+        }
+    }
+}
+
+impl RuleTranslator {
     /// Translates a (normalized) body atom according to tau
-    pub fn translate_body_atom(
-        &self,
-        atom: &BodyAtom,
-        var_cache: &HashMap<Variable, Int>,
-        predicate_to_z3_fun: &HashMap<Tag, FuncDecl>,
-    ) -> Bool {
-        let predicate = predicate_to_z3_fun
+    pub fn translate_body_atom(&self, atom: &BodyAtom, var_cache: &HashMap<Variable, Int>) -> Bool {
+        let predicate = self
+            .predicate_to_z3_fun
             .get(&atom.predicate())
             .expect("predicate should be registered");
 
@@ -73,13 +73,9 @@ impl RuleVerifier {
     }
 
     /// Translates a (normalized) head atom according to tau
-    pub fn translate_head_atom(
-        &self,
-        atom: &HeadAtom,
-        var_cache: &HashMap<Variable, Int>,
-        predicate_to_z3_fun: &HashMap<Tag, FuncDecl>,
-    ) -> Bool {
-        let predicate = predicate_to_z3_fun
+    pub fn translate_head_atom(&self, atom: &HeadAtom, var_cache: &HashMap<Variable, Int>) -> Bool {
+        let predicate = self
+            .predicate_to_z3_fun
             .get(&atom.predicate())
             .expect("predicate should be registered");
 
@@ -130,10 +126,10 @@ impl RuleVerifier {
                 );
                 match kind {
                     crate::rule_model::components::term::operation::operation_kind::OperationKind::Equal => {
-                        left.as_bool().expect("msg").eq(right.as_bool().expect("msg")).into()
+                        left.as_int().expect("msg").eq(right.as_int().expect("msg")).into()
                     }
                     crate::rule_model::components::term::operation::operation_kind::OperationKind::Unequals => {
-                        left.as_bool().expect("msg").ne(right.as_bool().expect("msg")).into()
+                        left.as_int().expect("msg").ne(right.as_int().expect("msg")).into()
                     },
                     crate::rule_model::components::term::operation::operation_kind::OperationKind::NumericSum => {
                         (left.as_int().expect("msg") + right.as_int().expect("msg")).into()
@@ -160,47 +156,6 @@ impl RuleVerifier {
                 }
             }
         }
-    }
-
-    /// Translate a (normalized) rule (TODO: handle predicates with cache)
-    pub fn translate_rule(
-        &self,
-        rule: &NormalizedRule,
-        predicate_to_z3_fun: &HashMap<Tag, FuncDecl>,
-        var_cache: &HashMap<Variable, Int>,
-        program: &NormalizedProgram,
-    ) -> Vec<Bool> {
-        let mut body_terms = Vec::new();
-        for atom in rule.positive() {
-            let smt_atom = self.translate_body_atom(atom, &var_cache, predicate_to_z3_fun);
-            body_terms.push(smt_atom);
-
-            body_terms.extend(
-                program
-                    .predicate_to_global_annotation(&atom.predicate())
-                    .iter()
-                    .map(|a| self.translate_body_assertion(a, atom, var_cache)),
-            );
-        }
-
-        //TODO: gather possible propagated restrictions (each instance should be an conjunction, and disjunt all of them)
-        // test if this is computationally feasable
-        let body_operations = rule.operations().iter().map(|b| {
-            self.translate_operation(b, &var_cache)
-                .as_bool()
-                .expect("Top level operations should have Sort Bool")
-        });
-
-        body_terms.extend(body_operations);
-
-        // TODO: maybe move the ground to the body somehow, support rules with only one head maybe?
-        // Build the rules
-        /*rule.head()
-        .iter()
-        .map(|h| self.translate_head_atom(h, &var_cache, predicate_to_z3_fun))
-        .map(|h| h.implies(&body))
-        .collect();*/
-        body_terms
     }
 
     /// Translates the global assertion body
@@ -243,8 +198,47 @@ impl RuleVerifier {
         Bool::and(&body_constraints)
     }
 
+    /// Translate a (normalized) rule (TODO: handle predicates with cache)
+    pub fn translate_rule(
+        &self,
+        rule: &NormalizedRule,
+        var_cache: &HashMap<Variable, Int>,
+        program: &NormalizedProgram,
+    ) -> Vec<Bool> {
+        let mut body_terms = Vec::new();
+        for atom in rule.positive() {
+            let smt_atom = self.translate_body_atom(atom, &var_cache);
+            body_terms.push(smt_atom);
+
+            body_terms.extend(
+                program
+                    .predicate_to_global_annotation(&atom.predicate())
+                    .iter()
+                    .map(|a| self.translate_body_assertion(a, atom, var_cache)),
+            );
+        }
+
+        //TODO: gather possible propagated restrictions (each instance should be an conjunction, and disjunt all of them)
+        // test if this is computationally feasable
+        let body_operations = rule.operations().iter().map(|b| {
+            self.translate_operation(b, &var_cache)
+                .as_bool()
+                .expect("Top level operations should have Sort Bool")
+        });
+
+        body_terms.extend(body_operations);
+
+        // TODO: maybe move the ground to the body somehow, support rules with only one head maybe?
+        // Build the rules
+        /*rule.head()
+        .iter()
+        .map(|h| self.translate_head_atom(h, &var_cache, predicate_to_z3_fun))
+        .map(|h| h.implies(&body))
+        .collect();*/
+        body_terms
+    }
+
     /// Translates the assertion for the head predicate into smt representation
-    /// TODO: test with groundstuff in head
     pub fn translate_head_assertion(
         &self,
         assertion: &NormalizedGlobalAnnotation,
@@ -254,7 +248,6 @@ impl RuleVerifier {
         let substitution = head_predicate.terms().zip(assertion.variables());
 
         // Map the head atom terms to variables in the assertion body
-        // This should probably work, but could be a source of bugs
         let prim_cache: HashMap<Variable, Int> = substitution
             .map(|(p, v)| match p {
                 Primitive::Variable(head_var) => (
@@ -282,72 +275,5 @@ impl RuleVerifier {
             .collect();
 
         Bool::and(&head_assertions)
-    }
-
-    /// Verifies a whether a rule satisfies it's annotations
-    /// TODO: probably change to special IH terms
-    /// body /\ assertions on body |= assertions on head
-    pub fn verify_rule(program: &NormalizedProgram, rule: &NormalizedRule) {
-        let verifier = RuleVerifier::new();
-        let solver = Solver::new();
-
-        let bool_sort = Sort::bool();
-        let int_sort = Sort::int();
-        // Register all predicates of the rule
-        let mut predicate_to_z3_fun: HashMap<Tag, FuncDecl> = HashMap::new();
-
-        for (tag, arity) in rule.predicates() {
-            let args_sort = vec![&int_sort; arity];
-            let pred = FuncDecl::new(tag.name(), &args_sort, &bool_sort);
-            predicate_to_z3_fun.insert(tag, pred);
-        }
-        let var_cache: HashMap<Variable, Int> = rule
-            .variables()
-            .map(|v| {
-                (
-                    v.clone(),
-                    Int::fresh_const(v.name().expect("Anon vars not supported yet")),
-                )
-            })
-            .collect();
-
-        // Translate rule body
-        let body_instance =
-            verifier.translate_rule(rule, &predicate_to_z3_fun, &var_cache, program);
-        for term in body_instance {
-            solver.assert(term);
-        }
-
-        // Translate assertion for head (For now only one head predicate & only one assertion)
-        let head = &rule.head()[0];
-        let head_assertions = program.predicate_to_global_annotation(&head.predicate());
-        let head_restriction =
-            verifier.translate_head_assertion(head_assertions[0], head, &var_cache);
-        solver.assert(&head_restriction.not());
-
-        let smt = solver.to_smt2();
-        println!("{smt}");
-        match solver.check() {
-            z3::SatResult::Unsat => println!("Validated: spec holds"),
-            z3::SatResult::Unknown => println!("Could not validate (unknown)"),
-            z3::SatResult::Sat => {
-                let model = solver.get_model().expect("Sat model should exist");
-                let var_interpretation: String = head
-                    .variables()
-                    .map(|v| {
-                        let inter = model
-                            .get_const_interp(var_cache.get(v).expect("Var should be in cache"))
-                            .expect("Counterexample should exist for violation");
-                        format!("{} : {}", v, inter)
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                println!("{rule}");
-                println!(
-                    "Violation for {} found with model {}",
-                    head_assertions[0], var_interpretation
-                )
-            }
-        }
     }
 }

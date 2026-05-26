@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use std::i64;
 use std::ops::{Add, Mul, Sub};
 
-use smtlib::lowlevel::ast::Command;
 use smtlib::{
     Bool, Error, Int, SatResult, Solver, Storage, backend::z3_binary::Z3Binary, funs::Fun,
     prelude::*, terms::Dynamic,

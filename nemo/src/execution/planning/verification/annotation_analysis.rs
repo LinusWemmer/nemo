@@ -15,7 +15,7 @@ use crate::{
             verification::{
                 annotation_analysis::rule_selection::RuleAnalysisGraph,
                 restriction::{RANGE_INF, RangeRestriction},
-                rule_verifier::RuleVerifier,
+                rule_verification::RuleVerifier,
                 smt_builder::Lowering,
             },
         },
@@ -220,6 +220,7 @@ impl AnnotationAnalyzer {
                     //Restrictions on the variables in the rule at current iteration
                     self.rule_var_restrictions(rule, &mut variable_restrictions);
                     RuleVerifier::verify_rule(self.program(), rule);
+                    RuleVerifier::propagate_filters(&rule, self.program());
                     let sat = Lowering::check_rule(rule, &variable_restrictions)
                         .expect("smt call didn't work");
                     /* idea:
