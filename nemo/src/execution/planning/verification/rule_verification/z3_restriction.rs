@@ -8,7 +8,7 @@ use z3::{
 };
 
 use crate::{
-    execution::planning::normalization::atom::head::HeadAtom,
+    execution::planning::normalization::atom::{body::BodyAtom, head::HeadAtom},
     rule_model::components::term::primitive::{
         Primitive::{self, Ground},
         variable::Variable,
@@ -16,6 +16,7 @@ use crate::{
 };
 
 /// Represents a restriction using z3 predicates very WIP
+/// TODO: handle empty restrictions -> should be false, i.e. no restrictions, empty or is false (check if it works on its own)
 #[derive(Debug, Clone)]
 pub struct Restriction {
     /// Variable names in restriction
@@ -84,6 +85,26 @@ impl Restriction {
         }
     }
 
+    /// Returns the restrictions for a given body atom
+    pub fn get_restrictions_for_body(
+        &self,
+        body_atom: &BodyAtom,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Bool {
+        let substitution: Vec<(&Int, &Int)> = self
+            .head_vars
+            .iter()
+            .zip(body_atom.terms())
+            .map(|(v_res, v_body)| {
+                (
+                    v_res,
+                    var_cache.get(v_body).expect("var should be registered"),
+                )
+            })
+            .collect();
+        self.restrictions.substitute(&substitution)
+    }
+
     /// Adds a restriction to the set of restrictions, returns true if something changes, false otherwise
     pub fn add_restriction_from_propagation(
         &mut self,
@@ -115,7 +136,7 @@ impl Restriction {
         if let Some(goal) = result.first() {
             self.restrictions = Bool::and(&goal.get_formulas());
         }
-
+        // TODO: actually check for equivalence to the formula before
         true
     }
 }

@@ -15,7 +15,7 @@ use crate::{
             verification::{
                 annotation_analysis::rule_selection::RuleAnalysisGraph,
                 restriction::{RANGE_INF, RangeRestriction},
-                rule_verification::RuleVerifier,
+                rule_verification::{RuleVerifier, z3_restriction::Restriction},
                 smt_builder::Lowering,
             },
         },
@@ -41,6 +41,9 @@ pub struct AnnotationAnalyzer {
 
     /// The Set of Restrictions on the predicate with respective arity
     unary_restrictions: HashMap<(Tag, usize), RangeRestriction>,
+
+    /// Restrictions of Tags
+    smt_restrictions: HashMap<Tag, Restriction>,
 }
 
 impl AnnotationAnalyzer {
@@ -50,6 +53,7 @@ impl AnnotationAnalyzer {
         Self {
             program,
             unary_restrictions: HashMap::default(),
+            smt_restrictions: HashMap::default(),
         }
     }
 
@@ -204,6 +208,7 @@ impl AnnotationAnalyzer {
 
         // TODO: maybe change restriction from range to sets of >/<
         // Do a topological bottom up propagation
+        let mut verifier = RuleVerifier::new();
         while let Some(scc) = rule_graph.next_scc() {
             let mut delta = true;
             while delta {
@@ -219,8 +224,11 @@ impl AnnotationAnalyzer {
                     // TODO: move this into rule_var restrictions and return, this doesn't need to be mut otherwise
                     //Restrictions on the variables in the rule at current iteration
                     self.rule_var_restrictions(rule, &mut variable_restrictions);
-                    RuleVerifier::verify_rule(self.program(), rule);
-                    RuleVerifier::propagate_filters(&rule, self.program());
+                    //TODO: RuleVerifier: create one, give the HashMap of Tags to Restrictions, should only be used
+                    // in the rule verifier -> Makes this function but for z3 waaay cleaner
+
+                    verifier.verify_rule(self.program(), rule);
+                    verifier.propagate_filters(&rule, self.program());
                     let sat = Lowering::check_rule(rule, &variable_restrictions)
                         .expect("smt call didn't work");
                     /* idea:
@@ -327,5 +335,12 @@ impl AnnotationAnalyzer {
                 self.verify_global_annotation(annotation);
             }
         }
+    }
+
+    /// TODO: change this name down the line,
+    ///  also: add second annotations for idb annotations where we only want to assert things on the input
+    /// not every derivation step, or otherwise give an inductive or spec predicate
+    pub fn propagate_annotations_alt(&mut self) {
+        // TODO: Verify facts
     }
 }

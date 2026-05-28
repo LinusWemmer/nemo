@@ -1,17 +1,18 @@
 //! Gernerates the RuleVerifier of a program
 use std::collections::{HashMap, HashSet};
 
-use crate::execution::planning::verification::rule_verification::z3_translation::RuleTranslator;
+use crate::execution::planning::verification::rule_verification::{
+    z3_restriction::Restriction, z3_translation::RuleTranslator,
+};
 
 use crate::{
     execution::planning::normalization::{program::NormalizedProgram, rule::NormalizedRule},
     rule_model::components::{tag::Tag, term::primitive::variable::Variable},
 };
 
-use z3::ast::exists_const;
 use z3::{
     self, FuncDecl, Sort,
-    ast::{Ast, Bool, Int},
+    ast::{Ast, Bool, Int, exists_const},
 };
 use z3::{Goal, Solver, Tactic};
 
@@ -19,10 +20,11 @@ pub mod z3_restriction;
 pub mod z3_translation;
 
 /// Struct for converting and verifying rules with z3
-/// TODO: split this up into two components, the translator and the verifier tool
-#[derive(Debug, Copy, Clone)]
+
+#[derive(Debug, Clone)]
 pub struct RuleVerifier {
     fresh_var_counter: usize,
+    predicate_restrictions: HashMap<Tag, Restriction>,
 }
 
 impl RuleVerifier {
@@ -30,6 +32,7 @@ impl RuleVerifier {
     pub fn new() -> Self {
         Self {
             fresh_var_counter: 0,
+            predicate_restrictions: HashMap::new(),
         }
     }
     /// Generates a new var for the program
@@ -41,7 +44,7 @@ impl RuleVerifier {
     /// Verifies a whether a rule satisfies it's annotations
     /// TODO: probably change to special IH terms
     /// body /\ assertions on body |= assertions on head
-    pub fn verify_rule(program: &NormalizedProgram, rule: &NormalizedRule) {
+    pub fn verify_rule(&self, program: &NormalizedProgram, rule: &NormalizedRule) {
         let solver = Solver::new();
 
         let bool_sort = Sort::bool();
@@ -71,44 +74,63 @@ impl RuleVerifier {
         for term in body_instance {
             solver.assert(term);
         }
+        // Translate propagated restrictions on body atoms
+        let prop_restrictions = rule.positive().iter().filter_map(|b| {
+            self.predicate_restrictions
+                .get(&b.predicate())
+                .and_then(|r| Some(r.get_restrictions_for_body(b, &var_cache)))
+        });
+        for term in prop_restrictions {
+            solver.assert(&term);
+        }
 
-        // Translate assertion for head (For now only one head predicate & only one assertion)
-        let head = &rule.head()[0];
-        let head_assertions = program.predicate_to_global_annotation(&head.predicate());
-        let head_restriction =
-            verifier.translate_head_assertion(head_assertions[0], head, &var_cache);
-        solver.assert(&head_restriction.not());
-
-        let smt = solver.to_smt2();
-        println!("{smt}");
-        match solver.check() {
-            z3::SatResult::Unsat => println!("Validated: spec holds"),
-            z3::SatResult::Unknown => println!("Could not validate (unknown)"),
-            z3::SatResult::Sat => {
-                let model = solver.get_model().expect("Sat model should exist");
-                let var_interpretation: String = head
-                    .variables()
-                    .map(|v| {
-                        let inter = model
-                            .get_const_interp(var_cache.get(v).expect("Var should be in cache"))
-                            .expect("Counterexample should exist for violation");
-                        format!("{} : {}", v, inter)
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                println!("{rule}");
-                println!(
-                    "Violation for {} found with var assigment {}",
-                    head_assertions[0], var_interpretation
-                )
+        // Translate assertion for head, verify each
+        for head in rule.head() {
+            solver.push();
+            let head_atom_assertions = program.predicate_to_global_annotation(&head.predicate());
+            if let Some(assertion) = head_atom_assertions.first() {
+                let head_assertion = verifier.translate_head_assertion(assertion, head, &var_cache);
+                solver.assert(&head_assertion.not());
+                let smt = solver.to_smt2();
+                println!("{smt}");
+                match solver.check() {
+                    z3::SatResult::Unsat => println!("Validated: spec holds"),
+                    z3::SatResult::Unknown => println!("Could not validate (unknown)"),
+                    z3::SatResult::Sat => {
+                        let model = solver.get_model().expect("Sat model should exist");
+                        let var_interpretation: String = head
+                            .variables()
+                            .map(|v| {
+                                let inter = model
+                                    .get_const_interp(
+                                        var_cache.get(v).expect("Var should be in cache"),
+                                    )
+                                    .expect("Counterexample should exist for violation");
+                                format!("{} : {}", v, inter)
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        println!("{rule}");
+                        println!(
+                            "Violation for {} found with var assigment {}",
+                            assertion, var_interpretation
+                        )
+                    }
+                }
             }
+            solver.pop(1);
         }
     }
 
     /// gets filter atoms for head?
-    /// TODO: change this to some sort of horn rule/maximize/minimize as before
+    /// TODO: change this to some sort of horn rule/maximize/minimize as before?
+    /// maybe instead directly write into self
     /// => we only want to keep
-    pub fn propagate_filters(rule: &NormalizedRule, _program: &NormalizedProgram) -> Vec<Bool> {
+    pub fn propagate_filters(
+        &mut self,
+        rule: &NormalizedRule,
+        _program: &NormalizedProgram,
+    ) -> bool {
         let verifier = RuleTranslator::new();
 
         let tactic_qe = Tactic::new("qe");
@@ -136,8 +158,19 @@ impl RuleVerifier {
             .collect();
 
         let body_translation = Bool::and(&body_operations);
-        //TODO: insert restrictions&specs here !IMPORTANT!
+        // Translate propagated restrictions on body atoms
+        // Introducing existential not necessary, as it is alread quantified
+        let restrictions = rule.positive().iter().filter_map(|b| {
+            self.predicate_restrictions
+                .get(&b.predicate())
+                .and_then(|r| Some(r.get_restrictions_for_body(b, &var_cache)))
+        });
+        for term in restrictions {
+            goal.assert(&term);
+        }
 
+        //TODO: check what is necessary, i.e. should head vars be existential based on the concrete head or something else
+        // TODO: head vars for each head seperately, filter the propagate formulas for that
         let head_variables: HashSet<&Variable> = rule
             .head()
             .iter()
@@ -167,10 +200,26 @@ impl RuleVerifier {
         // might have issues with termination. Think about IR for now?
         if let Some(goal) = result.first() {
             let filters = goal.get_formulas();
-            println!("{:#?}", filters);
-            filters
+            for filter in &filters {
+                println!("{filter}");
+            }
+            self.predicate_restrictions
+                .entry(rule.head()[0].predicate())
+                .and_modify(|res| {
+                    res.add_restriction_from_propagation(
+                        &rule.head()[0],
+                        &var_cache,
+                        &Bool::and(&filters),
+                    );
+                })
+                .or_insert(Restriction::new_from_propagation(
+                    &rule.head()[0],
+                    &var_cache,
+                    &Bool::and(&filters),
+                ));
+            true
         } else {
-            Vec::new()
+            false
         }
     }
 }
