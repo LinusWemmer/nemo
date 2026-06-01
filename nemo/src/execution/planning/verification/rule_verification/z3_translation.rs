@@ -140,6 +140,9 @@ impl RuleTranslator {
                     crate::rule_model::components::term::operation::operation_kind::OperationKind::NumericProduct => {
                         (left.as_int().expect("msg") * right.as_int().expect("msg")).into()
                     },
+                    crate::rule_model::components::term::operation::operation_kind::OperationKind::NumericDivision => {
+                        (left.as_int().expect("msg") / right.as_int().expect("msg")).into()
+                    },
                     crate::rule_model::components::term::operation::operation_kind::OperationKind::NumericGreaterthaneq => {
                         left.as_int().expect("msg").ge(right.as_int().expect("msg")).into()
                     },

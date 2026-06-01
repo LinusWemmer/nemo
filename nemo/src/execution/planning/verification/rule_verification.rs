@@ -91,10 +91,10 @@ impl RuleVerifier {
             if let Some(assertion) = head_atom_assertions.first() {
                 let head_assertion = verifier.translate_head_assertion(assertion, head, &var_cache);
                 solver.assert(&head_assertion.not());
-                let smt = solver.to_smt2();
-                println!("{smt}");
+                //let smt = solver.to_smt2();
+                //println!("{smt}");
                 match solver.check() {
-                    z3::SatResult::Unsat => println!("Validated: spec holds"),
+                    z3::SatResult::Unsat => println!("Validated: spec for {assertion} holds"),
                     z3::SatResult::Unknown => println!("Could not validate (unknown)"),
                     z3::SatResult::Sat => {
                         let model = solver.get_model().expect("Sat model should exist");
@@ -146,18 +146,13 @@ impl RuleVerifier {
             })
             .collect();
 
-        let body_operations: Vec<Bool> = rule
-            .operations()
-            .iter()
-            .map(|b| {
-                verifier
-                    .translate_operation(b, &var_cache)
-                    .as_bool()
-                    .expect("Top level operations should have Sort Bool")
-            })
-            .collect();
+        let body_operations = rule.operations().iter().map(|b| {
+            verifier
+                .translate_operation(b, &var_cache)
+                .as_bool()
+                .expect("Top level operations should have Sort Bool")
+        });
 
-        let body_translation = Bool::and(&body_operations);
         // Translate propagated restrictions on body atoms
         // Introducing existential not necessary, as it is alread quantified
         let restrictions = rule.positive().iter().filter_map(|b| {
@@ -165,9 +160,8 @@ impl RuleVerifier {
                 .get(&b.predicate())
                 .and_then(|r| Some(r.get_restrictions_for_body(b, &var_cache)))
         });
-        for term in restrictions {
-            goal.assert(&term);
-        }
+        let body_restrictions: Vec<Bool> = body_operations.chain(restrictions).collect();
+        let body_translation = Bool::and(&body_restrictions);
 
         //TODO: check what is necessary, i.e. should head vars be existential based on the concrete head or something else
         // TODO: head vars for each head seperately, filter the propagate formulas for that
@@ -200,24 +194,31 @@ impl RuleVerifier {
         // might have issues with termination. Think about IR for now?
         if let Some(goal) = result.first() {
             let filters = goal.get_formulas();
-            for filter in &filters {
-                println!("{filter}");
-            }
+            /*for filter in &filters {
+                println!("filter: {filter}");
+            }*/
+
+            let mut delta = true;
+
+            // Temp until iteration over head implemented
+            // Instead of entry check first outside of closure
+            let head = &rule.head()[0];
+
             self.predicate_restrictions
-                .entry(rule.head()[0].predicate())
+                .entry(head.predicate())
                 .and_modify(|res| {
-                    res.add_restriction_from_propagation(
+                    delta = res.add_restriction_from_propagation(
                         &rule.head()[0],
                         &var_cache,
                         &Bool::and(&filters),
                     );
                 })
                 .or_insert(Restriction::new_from_propagation(
-                    &rule.head()[0],
+                    head,
                     &var_cache,
                     &Bool::and(&filters),
                 ));
-            true
+            delta
         } else {
             false
         }

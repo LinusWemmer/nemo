@@ -15,14 +15,11 @@ use crate::{
             verification::{
                 annotation_analysis::rule_selection::RuleAnalysisGraph,
                 restriction::{RANGE_INF, RangeRestriction},
-                rule_verification::{RuleVerifier, z3_restriction::Restriction},
+                rule_verification::RuleVerifier,
                 smt_builder::Lowering,
             },
         },
-        selection_strategy::dependency_graph::{
-            graph_constructor::{DependencyGraph, DependencyGraphConstructor},
-            graph_positive::GraphConstructorPositive,
-        },
+        selection_strategy::dependency_graph::graph_positive::GraphConstructorPositive,
     },
     rule_model::components::{
         tag::Tag,
@@ -41,9 +38,6 @@ pub struct AnnotationAnalyzer {
 
     /// The Set of Restrictions on the predicate with respective arity
     unary_restrictions: HashMap<(Tag, usize), RangeRestriction>,
-
-    /// Restrictions of Tags
-    smt_restrictions: HashMap<Tag, Restriction>,
 }
 
 impl AnnotationAnalyzer {
@@ -53,22 +47,12 @@ impl AnnotationAnalyzer {
         Self {
             program,
             unary_restrictions: HashMap::default(),
-            smt_restrictions: HashMap::default(),
         }
     }
 
     /// Return the underlying program
     pub fn program(&self) -> &NormalizedProgram {
         &self.program
-    }
-
-    /// Generates the dependency graph of the given program
-    pub fn generate_rule_dependency(program: &NormalizedProgram) -> DependencyGraph {
-        let mut rules = Vec::<&NormalizedRule>::default();
-        for rule in program.rules() {
-            rules.push(rule);
-        }
-        GraphConstructorPositive::build_graph(&rules)
     }
 }
 
@@ -240,7 +224,6 @@ impl AnnotationAnalyzer {
                      */
                     // Make actual head pred restrictions from variable restrictions,TODO: maybe infer restriction for ground terms?
                     if sat {
-                        // TODO: just to test, change to actually collecting all
                         let annotation_ops: Vec<
                             crate::execution::planning::normalization::operation::Operation,
                         > = rule
@@ -342,5 +325,27 @@ impl AnnotationAnalyzer {
     /// not every derivation step, or otherwise give an inductive or spec predicate
     pub fn propagate_annotations_alt(&mut self) {
         // TODO: Verify facts
+        // TODO: input predicate
+        // TODO: start with initial assertions for propagation
+        let mut verifier = RuleVerifier::new();
+
+        let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
+            self.program.rules().iter().collect(),
+        );
+        // Do a topological bottom up propagation & verification
+        while let Some(scc) = rule_graph.next_scc() {
+            let mut delta = true;
+            // repeat in scc until fixpoint reached
+            while delta {
+                delta = false;
+
+                for rule_index in &scc {
+                    let rule = &self.program.rules()[*rule_index];
+                    println!("Checking rule {rule_index}: {rule}");
+                    verifier.verify_rule(self.program(), rule);
+                    delta = verifier.propagate_filters(&rule, self.program()) || delta;
+                }
+            }
+        }
     }
 }

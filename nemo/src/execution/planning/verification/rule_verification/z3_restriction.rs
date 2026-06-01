@@ -3,7 +3,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use z3::{
-    Goal, Tactic,
+    Goal, Solver, Tactic,
     ast::{Ast, Bool, Int},
 };
 
@@ -105,6 +105,22 @@ impl Restriction {
         self.restrictions.substitute(&substitution)
     }
 
+    /// Checks whether a new restriction actually gives new entailments
+    pub fn check_new_entailment(&self, new_restriction: &Bool) -> bool {
+        let solver = Solver::new();
+
+        solver.assert(self.restrictions.not());
+        solver.assert(new_restriction);
+
+        //println!("{}", solver.to_smt2());
+
+        match solver.check() {
+            z3::SatResult::Unsat => false,
+            z3::SatResult::Unknown => false,
+            z3::SatResult::Sat => true,
+        }
+    }
+
     /// Adds a restriction to the set of restrictions, returns true if something changes, false otherwise
     pub fn add_restriction_from_propagation(
         &mut self,
@@ -120,11 +136,14 @@ impl Restriction {
                 Ground(_) => None,
             })
             .collect();
-
         let tactic_simplify = Tactic::new("simplify");
         let goal = Goal::new(false, false, false);
 
         let new_restrictions = prop_restriction.substitute(&substitution);
+
+        if !self.check_new_entailment(&new_restrictions) {
+            return false;
+        }
         goal.assert(&Bool::or(&[&self.restrictions, &new_restrictions]));
 
         let result = tactic_simplify
@@ -135,8 +154,8 @@ impl Restriction {
 
         if let Some(goal) = result.first() {
             self.restrictions = Bool::and(&goal.get_formulas());
+            println!("simplified formulas:{:#?}", goal.get_formulas())
         }
-        // TODO: actually check for equivalence to the formula before
         true
     }
 }

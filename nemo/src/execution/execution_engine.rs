@@ -12,7 +12,8 @@ use nemo_physical::{
 use crate::{
     error::{Error, report::ProgramReport, warned::Warned},
     execution::planning::{
-        normalization::program::NormalizedProgram, strategy::forward::StrategyForward, verification::annotation_analysis::AnnotationAnalyzer,
+        normalization::program::NormalizedProgram, strategy::forward::StrategyForward,
+        verification::annotation_analysis::AnnotationAnalyzer,
     },
     io::{formats::Export, import_manager::ImportManager},
     rule_file::RuleFile,
@@ -112,7 +113,7 @@ impl<Strategy: RuleSelectionStrategy> ExecutionEngine<Strategy> {
         // Try to verify the program
         log::info!("Analyzing ... ");
         let mut analyzer = AnnotationAnalyzer::new(&normalized_program);
-        analyzer.propagate_annotations();
+        analyzer.propagate_annotations_alt();
         log::info!("Analyzing Done ... ");
 
         let mut table_manager = TableManager::new();
