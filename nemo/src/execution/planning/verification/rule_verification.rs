@@ -1,6 +1,7 @@
 //! Gernerates the RuleVerifier of a program
 use std::collections::{HashMap, HashSet};
 
+use crate::execution::planning::normalization::atom::ground::GroundAtom;
 use crate::execution::planning::verification::rule_verification::{
     z3_restriction::Restriction, z3_translation::RuleTranslator,
 };
@@ -57,7 +58,7 @@ impl RuleVerifier {
             let pred = FuncDecl::new(tag.name(), &args_sort, &bool_sort);
             predicate_to_z3_fun.insert(tag, pred);
         }
-        let verifier = RuleTranslator::new_with_predicates(predicate_to_z3_fun);
+        let translator = RuleTranslator::new_with_predicates(predicate_to_z3_fun);
 
         let var_cache: HashMap<Variable, Int> = rule
             .variables()
@@ -70,7 +71,7 @@ impl RuleVerifier {
             .collect();
 
         // Translate rule body
-        let body_instance = verifier.translate_rule(rule, &var_cache, program);
+        let body_instance = translator.translate_rule(rule, &var_cache, program);
         for term in body_instance {
             solver.assert(term);
         }
@@ -89,7 +90,8 @@ impl RuleVerifier {
             solver.push();
             let head_atom_assertions = program.predicate_to_global_annotation(&head.predicate());
             if let Some(assertion) = head_atom_assertions.first() {
-                let head_assertion = verifier.translate_head_assertion(assertion, head, &var_cache);
+                let head_assertion =
+                    translator.translate_head_assertion(assertion, head, &var_cache);
                 solver.assert(&head_assertion.not());
                 //let smt = solver.to_smt2();
                 //println!("{smt}");
@@ -122,16 +124,30 @@ impl RuleVerifier {
         }
     }
 
-    /// gets filter atoms for head?
+    /// Verifies whether a fact in a program satisfies it assertions
+    pub fn verify_facts(&self, fact: &GroundAtom, program: &NormalizedProgram) {
+        let translator = RuleTranslator::new();
+        let solver = Solver::new();
+        for annotation in program.predicate_to_global_annotation(&fact.predicate()) {
+            solver.push();
+            solver.assert(translator.translate_ground_assertion(annotation, fact));
+            match solver.check() {
+                z3::SatResult::Unsat => println!("{fact} does not satisfy assertion {annotation} "),
+                z3::SatResult::Unknown => println!("Could not validate {fact}"),
+                z3::SatResult::Sat => println!("Fact verified."),
+            }
+            solver.pop(1);
+        }
+    }
+
+    /// Propagates filters atoms from rule body to head, returns true if new info was gained
     /// TODO: change this to some sort of horn rule/maximize/minimize as before?
-    /// maybe instead directly write into self
-    /// => we only want to keep
     pub fn propagate_filters(
         &mut self,
         rule: &NormalizedRule,
         _program: &NormalizedProgram,
     ) -> bool {
-        let verifier = RuleTranslator::new();
+        let translator = RuleTranslator::new();
 
         let tactic_qe = Tactic::new("qe");
         let goal = Goal::new(false, false, false);
@@ -147,7 +163,7 @@ impl RuleVerifier {
             .collect();
 
         let body_operations = rule.operations().iter().map(|b| {
-            verifier
+            translator
                 .translate_operation(b, &var_cache)
                 .as_bool()
                 .expect("Top level operations should have Sort Bool")

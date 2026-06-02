@@ -324,10 +324,12 @@ impl AnnotationAnalyzer {
     ///  also: add second annotations for idb annotations where we only want to assert things on the input
     /// not every derivation step, or otherwise give an inductive or spec predicate
     pub fn propagate_annotations_alt(&mut self) {
-        // TODO: Verify facts
         // TODO: input predicate
-        // TODO: start with initial assertions for propagation
+        // TODO: start with initial assertions for propagation => solved by input
         let mut verifier = RuleVerifier::new();
+        for fact in self.program.facts() {
+            verifier.verify_facts(fact, self.program());
+        }
 
         let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
             self.program.rules().iter().collect(),

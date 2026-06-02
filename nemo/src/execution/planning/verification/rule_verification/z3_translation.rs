@@ -10,7 +10,7 @@ use z3::{
 
 use crate::{
     execution::planning::normalization::{
-        atom::{body::BodyAtom, head::HeadAtom},
+        atom::{body::BodyAtom, ground::GroundAtom, head::HeadAtom},
         global_annotation::NormalizedGlobalAnnotation,
         operation::Operation,
         program::NormalizedProgram,
@@ -91,6 +91,28 @@ impl RuleTranslator {
             .as_bool()
             .expect("translating head atom went wrong")
     }
+
+    /// Translate a ground atom TODO: allow other types than int (also in general needed)
+    /// => Actuall not needed
+    /*pub fn translate_ground_atom(&self, atom: &GroundAtom) -> Bool {
+        let bool_sort = Sort::bool();
+        let int_sort = Sort::int();
+
+        let args_sort = vec![&int_sort; atom.arity()];
+        let pred = FuncDecl::new(atom.predicate().name(), &args_sort, &bool_sort);
+
+        let term_list: Vec<Int> = atom
+            .terms()
+            .map(|t| Int::from_i64(t.value().to_i64_unchecked()))
+            .collect();
+
+        // I have no idead why this works, it also seems very convoluted
+        let args: Vec<&dyn Ast> = term_list.iter().map(|v| -> &dyn Ast { v }).collect();
+
+        pred.apply(&args)
+            .as_bool()
+            .expect("translating groudnd atom went wrong")
+    }*/
 
     /// Translates a primitive into an int for now
     pub fn translate_primitive(&self, prim: &Primitive, var_cache: &HashMap<Variable, Int>) -> Int {
@@ -179,7 +201,6 @@ impl RuleTranslator {
             .map(|(v_rule, v_assert)| {
                 (
                     v_assert.clone(),
-                    //TODO: map the vars to new variables, or even better the appropriate head var
                     var_cache
                         .get(v_rule)
                         .expect("Variable should be in cache")
@@ -209,6 +230,8 @@ impl RuleTranslator {
         program: &NormalizedProgram,
     ) -> Vec<Bool> {
         let mut body_terms = Vec::new();
+
+        //TODO: should this be moved to the verification, i.e. rule and assertion seperately?
         for atom in rule.positive() {
             let smt_atom = self.translate_body_atom(atom, &var_cache);
             body_terms.push(smt_atom);
@@ -239,6 +262,29 @@ impl RuleTranslator {
         .map(|h| h.implies(&body))
         .collect();*/
         body_terms
+    }
+
+    /// Translates assertion for a fact (ground atom)
+    pub fn translate_ground_assertion(
+        &self,
+        assertion: &NormalizedGlobalAnnotation,
+        fact: &GroundAtom,
+    ) -> Bool {
+        let substitution = fact.terms().zip(assertion.variables());
+        let prim_cache: HashMap<Variable, Int> = substitution
+            .map(|(t, v)| (v.clone(), Int::from_i64(t.value().to_i64_unchecked())))
+            .collect();
+
+        let ground_term_assertion: Vec<Bool> = assertion
+            .body()
+            .iter()
+            .map(|b| {
+                self.translate_operation(b, &prim_cache)
+                    .as_bool()
+                    .expect("Top level operations should have Sort Bool")
+            })
+            .collect();
+        Bool::and(&ground_term_assertion)
     }
 
     /// Translates the assertion for the head predicate into smt representation
