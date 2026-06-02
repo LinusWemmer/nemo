@@ -1,4 +1,4 @@
-//! This module defines [Global_Annotation].
+//! This module defines [Input_Annotation].
 
 use std::{collections::HashSet, fmt::Display, hash::Hash};
 
@@ -21,7 +21,7 @@ use super::{
 };
 
 #[derive(Debug, Clone)]
-pub struct GlobalAnnotation {
+pub struct InputAnnotation {
     /// Origin of this component
     origin: Origin,
     /// Id of this component
@@ -32,8 +32,8 @@ pub struct GlobalAnnotation {
     body: Vec<Operation>,
 }
 
-impl GlobalAnnotation {
-    /// Create a new [GlobalAnnotation].
+impl InputAnnotation {
+    /// Create a new [InputAnnotation].
     pub fn new(predicate: Atom, body: Vec<Operation>) -> Self {
         Self {
             origin: Origin::Created,
@@ -72,12 +72,12 @@ impl GlobalAnnotation {
     }
 }
 
-impl ComponentBehavior for GlobalAnnotation {
+impl ComponentBehavior for InputAnnotation {
     fn kind(&self) -> ProgramComponentKind {
-        ProgramComponentKind::GlobalAnnotation
+        ProgramComponentKind::InputAnnotation
     }
 
-    /// Validate the global annotation, the following should hold:
+    /// Validate the input annotation, the following should hold:
     ///     * All variables in the body occur in the predicate/predicate
     ///     * All body are either eq or unequal at highest level
     ///     * TODO: validate that assert atoms are only edb/facts, while the ensure need at least one non fact
@@ -117,7 +117,7 @@ impl ComponentBehavior for GlobalAnnotation {
     }
 }
 
-impl ComponentSource for GlobalAnnotation {
+impl ComponentSource for InputAnnotation {
     type Source = Origin;
 
     fn origin(&self) -> Origin {
@@ -129,7 +129,7 @@ impl ComponentSource for GlobalAnnotation {
     }
 }
 
-impl ComponentIdentity for GlobalAnnotation {
+impl ComponentIdentity for InputAnnotation {
     fn id(&self) -> ProgramComponentId {
         self.id
     }
@@ -139,7 +139,7 @@ impl ComponentIdentity for GlobalAnnotation {
     }
 }
 
-impl IterableComponent for GlobalAnnotation {
+impl IterableComponent for InputAnnotation {
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn super::ProgramComponent> + 'a> {
         let predicate_iterator = component_iterator(std::iter::once(&self.predicate));
         let body_iterator = component_iterator(self.body.iter());
@@ -157,7 +157,7 @@ impl IterableComponent for GlobalAnnotation {
     }
 }
 
-impl Display for GlobalAnnotation {
+impl Display for InputAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("#assert ")?;
         let pred = &self.predicate.to_string();
@@ -175,22 +175,22 @@ impl Display for GlobalAnnotation {
     }
 }
 
-impl PartialEq for GlobalAnnotation {
+impl PartialEq for InputAnnotation {
     fn eq(&self, other: &Self) -> bool {
         self.predicate == other.predicate && self.body == other.body
     }
 }
 
-impl Eq for GlobalAnnotation {}
+impl Eq for InputAnnotation {}
 
-impl Hash for GlobalAnnotation {
+impl Hash for InputAnnotation {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.predicate.hash(state);
         self.body.hash(state);
     }
 }
 
-impl IterableVariables for GlobalAnnotation {
+impl IterableVariables for InputAnnotation {
     fn variables<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Variable> + 'a> {
         Box::new(
             self.predicate()
@@ -209,7 +209,7 @@ impl IterableVariables for GlobalAnnotation {
     }
 }
 
-impl IterablePrimitives for GlobalAnnotation {
+impl IterablePrimitives for InputAnnotation {
     fn primitive_terms<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Primitive> + 'a> {
         let predicate_primitives = self.predicate.primitive_terms();
         let restriction_primitives = self

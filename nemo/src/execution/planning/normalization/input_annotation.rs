@@ -1,4 +1,4 @@
-//! This module defines [NormalizedGlobalAnnotation]
+//! This module defines [NormalizedInputAnnotation]
 
 use std::fmt::Display;
 
@@ -11,7 +11,7 @@ use crate::{
 
 /// Represents a normalized Global Annotation
 #[derive(Debug, Clone)]
-pub struct NormalizedGlobalAnnotation {
+pub struct NormalizedInputAnnotation {
     ///Headatom of the annotation TODO: maybe make this a body atom?
     head: BodyAtom,
 
@@ -19,7 +19,7 @@ pub struct NormalizedGlobalAnnotation {
     body: Vec<Operation>,
 }
 
-impl NormalizedGlobalAnnotation {
+impl NormalizedInputAnnotation {
     /// Return the head of the annotation
     pub fn head(&self) -> &BodyAtom {
         &self.head
@@ -31,17 +31,19 @@ impl NormalizedGlobalAnnotation {
     }
 }
 
-impl NormalizedGlobalAnnotation {
-    /// Normalizes the global annotation
-    pub fn normalize_global_annotation(
-        annotation: &crate::rule_model::components::global_annotation::GlobalAnnotation,
+impl NormalizedInputAnnotation {
+    /// Normalizes the input annotation
+    pub fn normalize_input_annotation(
+        annotation: &crate::rule_model::components::input_annotation::InputAnnotation,
     ) -> Self {
         let mut generator = VariableGenerator::default();
         let atom = annotation.predicate();
         let (head, new_operations) = BodyAtom::normalize_atom(&mut generator, atom);
 
         if !new_operations.is_empty() {
-            panic!("Operations and aggregations in annotation head aren't supported");
+            panic!(
+                "Operations and Aggregations should not be used in annotation head, same variables in head not supported yet"
+            );
         }
         let body = annotation
             .body()
@@ -58,7 +60,7 @@ impl NormalizedGlobalAnnotation {
     }
 }
 
-impl Display for NormalizedGlobalAnnotation {
+impl Display for NormalizedInputAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("#assert ")?;
         let pred = &self.head().to_string();

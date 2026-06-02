@@ -5,17 +5,18 @@
 #[macro_use]
 pub mod atom;
 pub mod fact;
+pub mod global_annotation;
 pub mod import_export;
+pub mod input_annotation;
 pub mod literal;
 pub mod output;
 pub mod parameter;
 pub mod rule;
+pub mod rule_annotation;
 pub mod statement;
 pub mod symbols;
 pub mod tag;
 pub mod term;
-pub mod global_annotation;
-pub mod rule_annotation;
 pub mod type_annotation;
 use std::{
     any::Any,
@@ -120,10 +121,13 @@ pub enum ProgramComponentKind {
     #[assoc(name = "fact")]
     Fact,
     ///Global Annotation
-    #[assoc(name= "global annotation")]
+    #[assoc(name = "global annotation")]
     GlobalAnnotation,
+    ///Input Annotation
+    #[assoc(name = "input annotation")]
+    InputAnnotation,
     ///Rule Annotation
-    #[assoc(name= "rule annotation")]
+    #[assoc(name = "rule annotation")]
     RuleAnnotation,
     ///Type Annotation
     #[assoc(name = "type annotation")]

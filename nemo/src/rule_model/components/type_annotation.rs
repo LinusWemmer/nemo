@@ -1,27 +1,17 @@
 //! This module defines [Global_Annotation].
 
-use std::{collections::HashSet, fmt::{Display, write}, hash::Hash};
+use std::{fmt::Display, hash::Hash};
 
 use crate::rule_model::{
-    components::{ProgramComponent, tag::Tag, term::operation::{Operation, operation_kind::OperationKind}},
-    error::{ValidationReport, validation_error::ValidationError},
-    origin::Origin,
-    pipeline::id::ProgramComponentId,
+    components::tag::Tag, error::ValidationReport, origin::Origin, pipeline::id::ProgramComponentId,
 };
 
 use super::{
-    ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, IterablePrimitives,
-    IterableVariables, ProgramComponentKind,
-    atom::Atom,
-    component_iterator, component_iterator_mut,
-    term::{
-        Term,
-        primitive::{Primitive, variable::Variable},
-    },
+    ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponentKind,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
-pub enum Sort{
+pub enum Sort {
     TypeInt,
     /// Existential variable
     TypeFloat,
@@ -31,9 +21,9 @@ pub enum Sort{
     TypeAnonymous,
 }
 
-impl Display for Sort{
+impl Display for Sort {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self{
+        match self {
             Sort::TypeInt => write!(f, "int"),
             Sort::TypeFloat => write!(f, "float"),
             Sort::TypeString => write!(f, "str"),
@@ -52,7 +42,6 @@ pub struct TypeAnnotation {
     predicate: Tag,
     /// body of the annotation
     body: Vec<Sort>,
-
 }
 
 impl TypeAnnotation {
@@ -80,7 +69,6 @@ impl TypeAnnotation {
     pub fn body_mut(&mut self) -> &mut Vec<Sort> {
         &mut self.body
     }
-
 }
 
 impl ComponentBehavior for TypeAnnotation {
@@ -88,10 +76,8 @@ impl ComponentBehavior for TypeAnnotation {
         ProgramComponentKind::TypeAnnotation
     }
 
-
     /// Validate the type annotation
     fn validate(&self) -> Result<(), ValidationReport> {
-
         ValidationReport::default().result()
     }
 
@@ -149,7 +135,7 @@ impl PartialEq for TypeAnnotation {
 
 impl Eq for TypeAnnotation {}
 
-impl Hash for TypeAnnotation{
+impl Hash for TypeAnnotation {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.predicate.hash(state);
         self.body.hash(state);

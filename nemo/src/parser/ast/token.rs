@@ -27,11 +27,11 @@ use crate::{
     },
     rule_model::components::ComponentSource,
     syntax::{
-        self, comment,
+        self, annotation_global, comment,
         datavalues::{self, RDF_DATATYPE_INDICATOR, boolean, iri, map, string, tuple},
         directive, encoding_prefixes,
         expression::{aggregate, atom, format_string, operation, variable},
-        operator, rule, rule_annotation, annotation_global, type_annotation
+        input_annotation, operator, rule, rule_annotation, type_annotation,
     },
 };
 
@@ -305,16 +305,19 @@ pub enum TokenKind {
     /// Open assert annotation
     #[assoc(name = annotation_global::OPEN_ASSERT)]
     OpenAssert,
+    /// Open assert annotation
+    #[assoc(name = input_annotation::OPEN_INPUT)]
+    OpenInput,
     /// Open type annotation
-    #[assoc(name = type_annotation::OPEN_TYPE)] 
+    #[assoc(name = type_annotation::OPEN_TYPE)]
     OpenType,
-    /// Indicate Integer Type 
+    /// Indicate Integer Type
     #[assoc(name = type_annotation::TYPE_INDICATOR_INT)]
     TypeIndicatorInt,
-    /// Indicate Integer Type 
+    /// Indicate Integer Type
     #[assoc(name = type_annotation::TYPE_INDICATOR_FLOAT)]
     TypeIndicatorFloat,
-    /// Indicate Integer Type 
+    /// Indicate Integer Type
     #[assoc(name = type_annotation::TYPE_INDICATOR_STRING)]
     TypeIndicatorString,
     /// Annotation Seperator
@@ -885,6 +888,7 @@ impl<'a> Token<'a> {
     string_token!(close_rule_annotation, TokenKind::CloseRuleAnnotation);
     string_token!(open_type_annotation, TokenKind::OpenType);
     string_token!(open_assert, TokenKind::OpenAssert);
+    string_token!(open_input, TokenKind::OpenInput);
     string_token!(annotation_seperator, TokenKind::AnnotationSeperator);
     string_token!(rule_arrow, TokenKind::RuleArrow);
     string_token!(universal_indicator, TokenKind::UniversalIndicator);

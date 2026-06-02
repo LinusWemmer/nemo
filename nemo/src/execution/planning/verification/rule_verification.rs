@@ -2,6 +2,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::execution::planning::normalization::atom::ground::GroundAtom;
+use crate::execution::planning::normalization::input_annotation::NormalizedInputAnnotation;
 use crate::execution::planning::verification::rule_verification::{
     z3_restriction::Restriction, z3_translation::RuleTranslator,
 };
@@ -40,6 +41,21 @@ impl RuleVerifier {
     pub fn get_fresh_var(&mut self) -> String {
         self.fresh_var_counter += 1;
         format!("V{}", self.fresh_var_counter)
+    }
+
+    /// Add predicate restrictions from input annotation
+    /// #Panics
+    ///  * panics when there are two input annotations for the same predicate
+    pub fn add_restriction_from_input_annotation(
+        &mut self,
+        annotation: &NormalizedInputAnnotation,
+    ) {
+        if let Some(_) = self.predicate_restrictions.insert(
+            annotation.head().predicate(),
+            Restriction::new_from_annotation(annotation),
+        ) {
+            panic!("Only one input annotation should be used per predicate")
+        }
     }
 
     /// Verifies a whether a rule satisfies it's annotations

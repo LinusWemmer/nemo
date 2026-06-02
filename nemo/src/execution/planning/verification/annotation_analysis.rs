@@ -16,7 +16,6 @@ use crate::{
                 annotation_analysis::rule_selection::RuleAnalysisGraph,
                 restriction::{RANGE_INF, RangeRestriction},
                 rule_verification::RuleVerifier,
-                smt_builder::Lowering,
             },
         },
         selection_strategy::dependency_graph::graph_positive::GraphConstructorPositive,
@@ -27,7 +26,7 @@ use crate::{
     },
 };
 
-pub mod analysis_report;
+//pub mod analysis_report;
 pub mod rule_selection;
 
 /// Analyzes the given annotations
@@ -35,9 +34,8 @@ pub mod rule_selection;
 pub struct AnnotationAnalyzer {
     /// The program to be analized
     program: NormalizedProgram,
-
-    /// The Set of Restrictions on the predicate with respective arity
-    unary_restrictions: HashMap<(Tag, usize), RangeRestriction>,
+    // The Set of Restrictions on the predicate with respective arity
+    //unary_restrictions: HashMap<(Tag, usize), RangeRestriction>,
 }
 
 impl AnnotationAnalyzer {
@@ -46,7 +44,7 @@ impl AnnotationAnalyzer {
         let program = program.clone();
         Self {
             program,
-            unary_restrictions: HashMap::default(),
+            //unary_restrictions: HashMap::default(),
         }
     }
 
@@ -69,7 +67,7 @@ impl AnnotationAnalyzer {
     }
 
     /// Gets the restrictions on the frontier variables based on previous restrictions in the body
-    pub fn rule_var_restrictions(
+    /*pub fn rule_var_restrictions(
         &self,
         rule: &NormalizedRule,
         variable_restrictions: &mut HashMap<Variable, Range<i64>>,
@@ -318,15 +316,17 @@ impl AnnotationAnalyzer {
                 self.verify_global_annotation(annotation);
             }
         }
-    }
+    }*/
 
     /// TODO: change this name down the line,
     ///  also: add second annotations for idb annotations where we only want to assert things on the input
     /// not every derivation step, or otherwise give an inductive or spec predicate
     pub fn propagate_annotations_alt(&mut self) {
-        // TODO: input predicate
-        // TODO: start with initial assertions for propagation => solved by input
         let mut verifier = RuleVerifier::new();
+
+        for input_annotation in self.program.input_annotations() {
+            verifier.add_restriction_from_input_annotation(input_annotation);
+        }
         for fact in self.program.facts() {
             verifier.verify_facts(fact, self.program());
         }

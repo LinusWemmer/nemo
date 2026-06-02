@@ -9,6 +9,7 @@ use nom::{
 
 use crate::parser::{
     ParserResult,
+    ast::input_annotation::InputAnnotation,
     context::{ParserContext, context},
     input::ParserInput,
     span::Span,
@@ -19,12 +20,12 @@ use super::{
     attribute::Attribute,
     comment::{doc::DocComment, wsoc::WSoC},
     directive::Directive,
+    global_annotation::GlobalAnnotation,
     guard::Guard,
     rule::Rule,
-    token::Token,
     rule_annotation::RuleAnnotation,
-    global_annotation::GlobalAnnotation,
-    type_annotation::TypeAnnotation
+    token::Token,
+    type_annotation::TypeAnnotation,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -41,6 +42,8 @@ pub enum StatementKind<'a> {
     Error(Token<'a>),
     /// Global Annotation
     GlobalAnnotation(GlobalAnnotation<'a>),
+    /// Global Annotation
+    InputAnnotation(InputAnnotation<'a>),
     /// Type Annotation
     TypeAnnotation(TypeAnnotation<'a>),
 }
@@ -53,9 +56,9 @@ impl<'a> StatementKind<'a> {
             StatementKind::Rule(statement) => statement.context(),
             StatementKind::Directive(statement) => statement.context(),
             StatementKind::GlobalAnnotation(statement) => statement.context(),
+            StatementKind::InputAnnotation(statement) => statement.context(),
             StatementKind::TypeAnnotation(statement) => statement.context(),
             StatementKind::Error(_statement) => ParserContext::Error,
-            
         }
     }
 
@@ -68,6 +71,7 @@ impl<'a> StatementKind<'a> {
                 map(Rule::parse, Self::Rule),
                 map(Guard::parse, Self::Fact),
                 map(GlobalAnnotation::parse, Self::GlobalAnnotation),
+                map(InputAnnotation::parse, Self::InputAnnotation),
             )),
         )(input)
     }
@@ -110,7 +114,6 @@ impl<'a> Statement<'a> {
     pub fn annotations(&self) -> &[RuleAnnotation<'a>] {
         &self.annotations
     }
-
 }
 
 const CONTEXT: ParserContext = ParserContext::Statement;
@@ -122,6 +125,7 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
             StatementKind::Rule(statement) => vec![statement],
             StatementKind::Directive(statement) => vec![statement],
             StatementKind::GlobalAnnotation(statement) => vec![statement],
+            StatementKind::InputAnnotation(statement) => vec![statement],
             StatementKind::TypeAnnotation(statement) => vec![statement],
             StatementKind::Error(_) => vec![],
         }
@@ -212,7 +216,7 @@ mod test {
                 "@export test :- csv{resource = \"\"}.",
                 ParserContext::Directive,
             ),
-            ( 
+            (
                 "#assert test(?X,?Y): ?X<3.",
                 ParserContext::GlobalAnnotation,
             ),
@@ -220,10 +224,7 @@ mod test {
                 "[assert: 0<?X, ?X<5]\n a(?x) :- b(?X).",
                 ParserContext::Rule,
             ),
-            (
-                "#assert test(?X,?Y): ?X<3.",
-                ParserContext::GlobalAnnotation,
-            ),
+            ("#input test(?X,?Y): ?X<3.", ParserContext::InputAnnotation),
         ];
 
         for (input, expect) in test {

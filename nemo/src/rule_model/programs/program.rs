@@ -4,7 +4,10 @@ use std::fmt::Write;
 
 use crate::rule_model::{
     components::{
-        ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponent, ProgramComponentKind, component_iterator, component_iterator_mut, global_annotation::GlobalAnnotation, rule::Rule, statement::Statement
+        ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponent,
+        ProgramComponentKind, component_iterator, component_iterator_mut,
+        global_annotation::GlobalAnnotation, input_annotation::InputAnnotation, rule::Rule,
+        statement::Statement,
     },
     error::ValidationReport,
     origin::Origin,
@@ -40,7 +43,7 @@ impl Program {
         }
     }
 
-    /// Returns the global annotations TODO/Note: This should maybe be in programwrite?
+    /// Returns the global annotations
     pub fn global_annotations(&self) -> impl Iterator<Item = &GlobalAnnotation> {
         self.statements().filter_map(|statement| match statement {
             Statement::GlobalAnnotation(global_annotation) => Some(global_annotation),
@@ -48,6 +51,13 @@ impl Program {
         })
     }
 
+    /// Returns the input annotations
+    pub fn input_annotations(&self) -> impl Iterator<Item = &InputAnnotation> {
+        self.statements().filter_map(|statement| match statement {
+            Statement::InputAnnotation(input_annotation) => Some(input_annotation),
+            _ => None,
+        })
+    }
 
     /// Remove all export statements
     pub fn clear_exports(&mut self) {
@@ -88,12 +98,6 @@ impl ProgramWrite for Program {
         self.rules.push(self.statements.len());
         self.statements.push(Statement::Rule(rule))
     }
-
-    //wip: maybe add a different type of program "annotated program"
-    //fn add_global_annotation(&mut self, global_annotation: GlobalAnnotation) {
-    //    self.statements.push(global_annotation)
-    //}
-
 }
 
 impl ComponentBehavior for Program {

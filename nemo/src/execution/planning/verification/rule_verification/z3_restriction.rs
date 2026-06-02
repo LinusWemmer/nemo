@@ -8,7 +8,13 @@ use z3::{
 };
 
 use crate::{
-    execution::planning::normalization::atom::{body::BodyAtom, head::HeadAtom},
+    execution::planning::{
+        normalization::{
+            atom::{body::BodyAtom, head::HeadAtom},
+            input_annotation::NormalizedInputAnnotation,
+        },
+        verification::rule_verification::z3_translation::RuleTranslator,
+    },
     rule_model::components::term::primitive::{
         Primitive::{self, Ground},
         variable::Variable,
@@ -26,16 +32,16 @@ pub struct Restriction {
 }
 
 impl Restriction {
-    /// Creates a new set of restricitons from GlobalAnnotation (actually not needed, as annotations are directly translated)
-    /*pub fn new_from_annotation(annotation: &NormalizedGlobalAnnotation) -> Self {
+    /// Creates a new set of restricitons from Input
+    pub fn new_from_annotation(annotation: &NormalizedInputAnnotation) -> Self {
+        let head_vars: Vec<Int> = (0..annotation.head().arity())
+            .map(|n| Int::fresh_const(&format!("V{n}")))
+            .collect();
+
         let var_cache: HashMap<Variable, Int> = annotation
             .variables()
-            .map(|v| {
-                (
-                    v.clone(),
-                    Int::fresh_const(v.name().expect("Anon vars not supported yet")),
-                )
-            })
+            .enumerate()
+            .map(|(pos, v)| (v.clone(), head_vars[pos].clone()))
             .collect();
 
         let translator = RuleTranslator::new();
@@ -50,13 +56,13 @@ impl Restriction {
             })
             .collect();
 
-        let res = Bool::and(&body);
+        let restriction = Bool::and(&body);
 
         Self {
-            var_cache,
-            restrictions: vec![res],
+            head_vars,
+            restrictions: restriction,
         }
-    }*/
+    }
 
     /// Creates a new [Restriction] from a propagated formula
     pub fn new_from_propagation(
@@ -68,7 +74,6 @@ impl Restriction {
             .map(|n| Int::fresh_const(&format!("V{n}")))
             .collect();
 
-        //TODO: get variables (Int)
         let substitution: Vec<(&Int, &Int)> = head
             .terms()
             .zip(head_vars.iter())

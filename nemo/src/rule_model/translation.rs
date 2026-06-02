@@ -5,18 +5,23 @@ pub(crate) mod basic;
 pub(crate) mod complex;
 pub(crate) mod directive;
 pub(crate) mod fact;
+pub(crate) mod global_annotation;
+pub(crate) mod input_annotation;
 pub(crate) mod literal;
 pub(crate) mod rule;
-pub(crate) mod global_annotation;
 pub(crate) mod rule_annotation;
-pub(crate) mod type_annotation;
 mod term;
+pub(crate) mod type_annotation;
 
-use std::{collections::HashMap, fmt::{Debug, Display}, ops::Range};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    ops::Range,
+};
 
 use attribute::{KnownAttributes, process_attributes};
-use rule_annotation::process_annotations;
 use directive::{handle_define_directive, handle_use_directive};
+use rule_annotation::process_annotations;
 
 use crate::{
     error::report::ProgramReport,
@@ -27,18 +32,14 @@ use crate::{
         input::ParserInput,
     },
     rule_file::RuleFile,
-    rule_model::programs::ProgramWrite,
+    rule_model::{components::input_annotation::InputAnnotation, programs::ProgramWrite},
     util::bag::Bag,
 };
 
 use super::{
     components::{
-        fact::Fact,
-        rule::Rule, 
-        term::Term, 
-        global_annotation::GlobalAnnotation, 
-        rule_annotation::RuleAnnotation,
-        type_annotation::TypeAnnotation,
+        fact::Fact, global_annotation::GlobalAnnotation, rule::Rule,
+        rule_annotation::RuleAnnotation, term::Term, type_annotation::TypeAnnotation,
     },
     error::{TranslationReport, translation_error::TranslationError},
 };
@@ -91,22 +92,21 @@ impl ASTProgramTranslation {
 
     /// Process annotations attached to a statement/rule
     fn process_annotations<'a>(&mut self, statement: &ast::statement::Statement<'a>) {
-
         match statement.kind() {
             ast::statement::StatementKind::Rule(_) => {
-                if let Some(annotations) =
-                    process_annotations(self, statement.annotations().iter())
+                if let Some(annotations) = process_annotations(self, statement.annotations().iter())
                 {
                     self.statement_annotations = annotations;
                 }
-            },
+            }
             _ => {
-                if !statement.annotations().is_empty(){
-                    self.report.add(statement, TranslationError::AnnotateNonRule);
+                if !statement.annotations().is_empty() {
+                    self.report
+                        .add(statement, TranslationError::AnnotateNonRule);
                 }
             }
         }
-    }        
+    }
 
     /// Translate the given [ProgramAST] into a [ProgramWrite].
     pub fn translate<'a, Writer: Debug + ProgramWrite>(
@@ -142,13 +142,24 @@ impl ASTProgramTranslation {
                     handle_use_directive(&mut self, directive, program);
                 }
                 ast::statement::StatementKind::GlobalAnnotation(global_annotation) => {
-                    if let Some(global_annotation) = GlobalAnnotation::build_component(&mut self, global_annotation){
+                    if let Some(global_annotation) =
+                        GlobalAnnotation::build_component(&mut self, global_annotation)
+                    {
                         program.add_global_annotation(global_annotation);
                     }
-                },
-                ast::statement::StatementKind::TypeAnnotation(type_annotation) =>{
-                    if let Some(type_annotation) = TypeAnnotation::build_component(&mut self, type_annotation){
-                        ();//program.add_type_annotation(type_annotation);
+                }
+                ast::statement::StatementKind::InputAnnotation(input_annotation) => {
+                    if let Some(input_annotation) =
+                        InputAnnotation::build_component(&mut self, input_annotation)
+                    {
+                        program.add_input_annotation(input_annotation);
+                    }
+                }
+                ast::statement::StatementKind::TypeAnnotation(type_annotation) => {
+                    if let Some(type_annotation) =
+                        TypeAnnotation::build_component(&mut self, type_annotation)
+                    {
+                        (); //program.add_type_annotation(type_annotation);
                     }
                 }
                 ast::statement::StatementKind::Error(_token) => {

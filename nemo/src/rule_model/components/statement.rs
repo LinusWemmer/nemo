@@ -9,9 +9,10 @@ use crate::rule_model::{
         ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent,
         IterablePrimitives, IterableVariables, ProgramComponent, ProgramComponentKind,
         fact::Fact,
-        import_export::{ExportDirective, ImportDirective},
-        output::Output,
         global_annotation::GlobalAnnotation,
+        import_export::{ExportDirective, ImportDirective},
+        input_annotation::InputAnnotation,
+        output::Output,
         parameter::ParameterDeclaration,
         rule::Rule,
         term::{
@@ -41,6 +42,8 @@ pub enum Statement {
     Parameter(ParameterDeclaration),
     /// GlobalAnnotation
     GlobalAnnotation(GlobalAnnotation),
+    /// InputAnnotation
+    InputAnnotation(InputAnnotation),
 }
 
 impl Statement {
@@ -75,7 +78,7 @@ impl Statement {
     }
     /// Check whether this statement is an annotation
     pub fn is_annotation(&self) -> bool {
-        matches!(self, Self::GlobalAnnotation(_))
+        matches!(self, Self::GlobalAnnotation(_)) || matches!(self, Self::InputAnnotation(_))
     }
 }
 
@@ -89,6 +92,7 @@ impl Display for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) =>statement,
+            Self::InputAnnotation(statement) =>statement,
         } {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
         }
@@ -105,6 +109,7 @@ impl ComponentBehavior for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
+            Self::InputAnnotation(statement) =>statement,
         } {
             fn kind(&self) -> ProgramComponentKind;
             fn validate(&self) -> Result<(), ValidationReport>;
@@ -125,6 +130,7 @@ impl ComponentSource for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
+            Self::InputAnnotation(statement) =>statement,
         } {
             fn origin(&self) -> Origin;
             fn set_origin(&mut self, origin: Origin);
@@ -142,6 +148,7 @@ impl ComponentIdentity for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
+            Self::InputAnnotation(statement) =>statement,
         } {
             fn id(&self) -> ProgramComponentId;
             fn set_id(&mut self, id: ProgramComponentId);
@@ -159,6 +166,7 @@ impl IterableComponent for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
+            Self::InputAnnotation(statement) =>statement,
         } {
             #[allow(late_bound_lifetime_arguments)]
             fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn ProgramComponent> + 'a>;
@@ -180,6 +188,7 @@ impl IterableVariables for Statement {
             Self::Output(statement) => statement.variables(),
             Self::Parameter(statement) => statement.variables(),
             Self::GlobalAnnotation(statement) => statement.variables(),
+            Self::InputAnnotation(statement) => statement.variables(),
         }
     }
 
@@ -192,6 +201,7 @@ impl IterableVariables for Statement {
             Self::Output(statement) => statement.variables_mut(),
             Self::Parameter(statement) => statement.variables_mut(),
             Self::GlobalAnnotation(statement) => statement.variables_mut(),
+            Self::InputAnnotation(statement) => statement.variables_mut(),
         }
     }
 }
@@ -206,6 +216,7 @@ impl IterablePrimitives for Statement {
             Self::Output(statement) => statement.primitive_terms(),
             Self::Parameter(statement) => statement.primitive_terms(),
             Self::GlobalAnnotation(statement) => statement.primitive_terms(),
+            Self::InputAnnotation(statement) => statement.primitive_terms(),
         }
     }
 
@@ -218,6 +229,7 @@ impl IterablePrimitives for Statement {
             Self::Output(statement) => statement.primitive_terms_mut(),
             Self::Parameter(statement) => statement.primitive_terms_mut(),
             Self::GlobalAnnotation(statement) => statement.primitive_terms_mut(),
+            Self::InputAnnotation(statement) => statement.primitive_terms_mut(),
         }
     }
 }
@@ -237,6 +249,12 @@ impl From<Fact> for Statement {
 impl From<GlobalAnnotation> for Statement {
     fn from(value: GlobalAnnotation) -> Self {
         Self::GlobalAnnotation(value)
+    }
+}
+
+impl From<InputAnnotation> for Statement {
+    fn from(value: InputAnnotation) -> Self {
+        Self::InputAnnotation(value)
     }
 }
 

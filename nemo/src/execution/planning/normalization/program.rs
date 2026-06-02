@@ -11,7 +11,9 @@ use crate::{
     execution::planning::{
         analysis::variable_order::build_preferable_variable_orders,
         normalization::{
-            atom::ground::GroundAtom, export::ExportInstruction, global_annotation::NormalizedGlobalAnnotation, import::ImportInstruction, rule::NormalizedRule 
+            atom::ground::GroundAtom, export::ExportInstruction,
+            global_annotation::NormalizedGlobalAnnotation, import::ImportInstruction,
+            input_annotation::NormalizedInputAnnotation, rule::NormalizedRule,
         },
     },
     rule_model::{
@@ -35,6 +37,8 @@ pub struct NormalizedProgram {
     output_predicates: Vec<Tag>,
     /// Global Annotations
     global_annotations: Vec<NormalizedGlobalAnnotation>,
+    /// Input Annotations
+    input_annotations: Vec<NormalizedInputAnnotation>,
 
     /// Predicate arities
     predicate_arities: HashMap<Tag, usize>,
@@ -123,13 +127,22 @@ impl NormalizedProgram {
     }
 
     /// Return a list of the global annotations of this program
-    pub fn global_annotations(&self) -> &Vec<NormalizedGlobalAnnotation>{
+    pub fn global_annotations(&self) -> &Vec<NormalizedGlobalAnnotation> {
         &self.global_annotations
     }
 
+    /// Return a list of the input annotations of this program
+    pub fn input_annotations(&self) -> &Vec<NormalizedInputAnnotation> {
+        &self.input_annotations
+    }
+
     /// Return all global annotations for the given predicate
-    pub fn predicate_to_global_annotation(&self, predicate: & Tag) -> Vec<&NormalizedGlobalAnnotation>{
-        self.global_annotations.iter()
+    pub fn predicate_to_global_annotation(
+        &self,
+        predicate: &Tag,
+    ) -> Vec<&NormalizedGlobalAnnotation> {
+        self.global_annotations
+            .iter()
             .filter(|annotation| &annotation.head().predicate() == predicate)
             .collect()
     }
@@ -137,6 +150,11 @@ impl NormalizedProgram {
     /// Add a global annotation to the normalized program
     pub fn add_global_annotation(&mut self, annotation: NormalizedGlobalAnnotation) {
         self.global_annotations.push(annotation)
+    }
+
+    /// Add a global annotation to the normalized program
+    pub fn add_input_annotation(&mut self, annotation: NormalizedInputAnnotation) {
+        self.input_annotations.push(annotation)
     }
 
     /// Return a list of output predicates contained in this program.
@@ -275,11 +293,18 @@ impl NormalizedProgram {
             result.add_rule(normalized_rule);
         }
 
-        // Handle annotations 
+        // Handle global annotations
         for annotation in program.global_annotations() {
-            let normalized_annotation = NormalizedGlobalAnnotation::normalize_global_annotaion(annotation);
-
+            let normalized_annotation =
+                NormalizedGlobalAnnotation::normalize_global_annotation(annotation);
             result.add_global_annotation(normalized_annotation);
+        }
+
+        // Handle input annotations
+        for annotation in program.input_annotations() {
+            let normalized_annotation =
+                NormalizedInputAnnotation::normalize_input_annotation(annotation);
+            result.add_input_annotation(normalized_annotation);
         }
 
         // Handle imports

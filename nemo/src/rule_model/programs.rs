@@ -2,19 +2,22 @@
 
 use std::collections::{HashMap, HashSet, hash_map::Entry};
 
-use crate::rule_model::{components::statement::Statement, error::info::Info};
+use crate::rule_model::{
+    components::{input_annotation::InputAnnotation, statement::Statement},
+    error::info::Info,
+};
 
 use super::{
     components::{
         IterableVariables, ProgramComponent, component_iterator,
         fact::Fact,
+        global_annotation::GlobalAnnotation,
         import_export::{ExportDirective, ImportDirective},
         literal::Literal,
         output::Output,
         parameter::ParameterDeclaration,
         rule::Rule,
         tag::Tag,
-        global_annotation::GlobalAnnotation,
         term::primitive::variable::{Variable, global::GlobalVariable},
     },
     error::{ValidationReport, validation_error::ValidationError},
@@ -56,6 +59,10 @@ pub trait ProgramWrite {
     /// Add a new global annotation to this prgoram.
     fn add_global_annotation(&mut self, global_annotation: GlobalAnnotation) {
         self.add_statement(global_annotation.into());
+    }
+    /// Add a new input annotation to this prgoram.
+    fn add_input_annotation(&mut self, input_annotation: InputAnnotation) {
+        self.add_statement(input_annotation.into());
     }
 }
 

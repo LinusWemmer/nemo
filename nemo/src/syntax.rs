@@ -83,32 +83,37 @@ pub mod rule {
     pub const OPEN_ATTRIBUTE: &str = "#[";
     /// The closing token for attributes.
     pub const CLOSE_ATTRIBUTE: &str = "]";
-    
 }
 
+//TODO: maybe put all annotations together?
 pub mod rule_annotation {
     //! This module contains syntax definitions for annotations.
 
     /// The opening token for annotations.
-    pub const OPEN_RULE_ANNOTATION : &str = "[assert:";
+    pub const OPEN_RULE_ANNOTATION: &str = "[assert:";
     /// The closing token for annotation.
     pub const CLOSE_RULE_ANNOTATION: &str = "]";
-    
 }
 
 pub mod annotation_global {
     //! This module contains syntax definitions for global annotations.
-    
-    /// opening token assert:
-    pub const OPEN_ASSERT : &str = "#assert";
-    /// seperator atom and restriction
-    pub const ANNOTATION_SEPERATOR : &str = ":";
 
+    /// opening token assert:
+    pub const OPEN_ASSERT: &str = "#assert";
+    /// seperator atom and restriction
+    pub const ANNOTATION_SEPERATOR: &str = ":";
+}
+
+pub mod input_annotation {
+    //! This module contains syntax definitions for input annotations.
+
+    /// opening token input:
+    pub const OPEN_INPUT: &str = "#input";
 }
 
 pub mod type_annotation {
     //! This module contains syntax definitions for type annotations/declarations.
-    
+
     /// opening token type assertion:
     pub const OPEN_TYPE: &str = "#type";
 

@@ -1,19 +1,20 @@
 //! This module defines the abstract syntax tree representation of a nemo program.
 
 pub mod attribute;
-pub mod rule_annotation;
-pub mod global_annotation;
-pub mod type_annotation;
 pub mod comment;
 pub mod directive;
 pub mod expression;
+pub mod global_annotation;
 pub mod guard;
+pub mod input_annotation;
 pub mod program;
 pub mod rule;
+pub mod rule_annotation;
 pub mod sequence;
 pub mod statement;
 pub mod tag;
 pub mod token;
+pub mod type_annotation;
 
 use std::{fmt::Debug, ops::Range};
 
