@@ -244,7 +244,6 @@ impl RuleTranslator {
             );
         }
 
-        //TODO: gather possible propagated restrictions (each instance should be an conjunction, and disjunt all of them)
         // test if this is computationally feasable
         let body_operations = rule.operations().iter().map(|b| {
             self.translate_operation(b, &var_cache)
@@ -254,13 +253,6 @@ impl RuleTranslator {
 
         body_terms.extend(body_operations);
 
-        // TODO: maybe move the ground to the body somehow, support rules with only one head maybe?
-        // Build the rules
-        /*rule.head()
-        .iter()
-        .map(|h| self.translate_head_atom(h, &var_cache, predicate_to_z3_fun))
-        .map(|h| h.implies(&body))
-        .collect();*/
         body_terms
     }
 

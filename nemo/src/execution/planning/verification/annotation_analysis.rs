@@ -318,15 +318,11 @@ impl AnnotationAnalyzer {
         }
     }*/
 
-    /// TODO: change this name down the line,
-    ///  also: add second annotations for idb annotations where we only want to assert things on the input
-    /// not every derivation step, or otherwise give an inductive or spec predicate
-    pub fn propagate_annotations_alt(&mut self) {
-        let mut verifier = RuleVerifier::new();
+    /// Verifies annotations of a program whether they all "support" each other without contradiction
+    /// No propagation is done, so most annotations have to be written by user
+    pub fn verify_annotation(&mut self) {
+        let verifier = RuleVerifier::new();
 
-        for input_annotation in self.program.input_annotations() {
-            verifier.add_restriction_from_input_annotation(input_annotation);
-        }
         for fact in self.program.facts() {
             verifier.verify_facts(fact, self.program());
         }
@@ -334,6 +330,69 @@ impl AnnotationAnalyzer {
         let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
             self.program.rules().iter().collect(),
         );
+
+        let mut valid = true;
+
+        // actually not really necessary
+        while let Some(scc) = rule_graph.next_scc() {
+            for rule_index in &scc {
+                let rule = &self.program.rules()[*rule_index];
+                println!("Checking rule {rule_index}: {rule}");
+                valid = verifier.verify_rule(self.program(), rule) && valid;
+            }
+        }
+        // TODO: only check for output predicates
+        if valid {
+            println!("Annotations could be verified to have no contradictions")
+        } else {
+            println!("Contradiction to annotations found")
+        }
+    }
+
+    // Propagates proof goals
+    pub fn goal_propagation(&mut self, verifier: &mut RuleVerifier) {
+        let output_predicates = self.program.output_predicates();
+
+        let fuel = 2;
+
+        let mut changed: HashSet<Tag> = HashSet::new();
+        // start with output predicates and turn them into goals
+        for predicate in output_predicates {
+            let output_annotations = self.program.predicate_to_global_annotation(predicate);
+            for annotation in output_annotations {
+                verifier.add_output_verification_goal(annotation);
+            }
+            changed.insert(predicate.clone());
+        }
+        for _ in 0..fuel {
+            let mut new_goals: HashSet<Tag> = HashSet::new();
+            for predicate in changed {
+                for index in self.program.rules_with_head_predicate(&predicate) {
+                    let rule = &self.program.rules()[index];
+                    new_goals = verifier.backward_prop_goals(&predicate, rule);
+                }
+            }
+            changed = new_goals;
+        }
+    }
+
+    /// not every derivation step, or otherwise give an inductive or spec predicate
+    /// Do this only if we actually have assertions for output predicate (e.g. for each predicate)
+    pub fn propagate_annotations_alt(&mut self) {
+        let mut verifier = RuleVerifier::new();
+
+        for input_annotation in self.program.input_annotations() {
+            verifier.add_restriction_from_input_annotation(input_annotation);
+        }
+
+        for fact in self.program.facts() {
+            verifier.verify_facts(fact, self.program());
+        }
+
+        let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
+            self.program.rules().iter().collect(),
+        );
+
         // Do a topological bottom up propagation & verification
         while let Some(scc) = rule_graph.next_scc() {
             let mut delta = true;
@@ -344,8 +403,9 @@ impl AnnotationAnalyzer {
                 for rule_index in &scc {
                     let rule = &self.program.rules()[*rule_index];
                     println!("Checking rule {rule_index}: {rule}");
-                    verifier.verify_rule(self.program(), rule);
-                    delta = verifier.propagate_filters(&rule, self.program()) || delta;
+                    if verifier.verify_rule(self.program(), rule) {
+                        delta = verifier.propagate_filters(&rule, self.program()) || delta;
+                    }
                 }
             }
         }

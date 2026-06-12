@@ -12,7 +12,7 @@ use crate::{
 /// Represents a normalized Global Annotation
 #[derive(Debug, Clone)]
 pub struct NormalizedGlobalAnnotation {
-    ///Headatom of the annotation TODO: maybe make this a body atom?
+    ///Headatom of the annotation
     head: BodyAtom,
 
     /// Restrictions placed on the head atom, TODO

@@ -26,8 +26,8 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Restriction {
     /// Variable names in restriction
-    head_vars: Vec<Int>,
-    /// Theory for bounds on the head TODO: change to single formula that gets changed &simplified
+    restriction_head_vars: Vec<Int>,
+    /// Theory for bounds on the head
     restrictions: Bool,
 }
 
@@ -59,7 +59,7 @@ impl Restriction {
         let restriction = Bool::and(&body);
 
         Self {
-            head_vars,
+            restriction_head_vars: head_vars,
             restrictions: restriction,
         }
     }
@@ -85,7 +85,7 @@ impl Restriction {
 
         let restrictions = prop_restriction.substitute(&substitution);
         Self {
-            head_vars,
+            restriction_head_vars: head_vars,
             restrictions,
         }
     }
@@ -97,7 +97,7 @@ impl Restriction {
         var_cache: &HashMap<Variable, Int>,
     ) -> Bool {
         let substitution: Vec<(&Int, &Int)> = self
-            .head_vars
+            .restriction_head_vars
             .iter()
             .zip(body_atom.terms())
             .map(|(v_res, v_body)| {
@@ -135,7 +135,7 @@ impl Restriction {
     ) -> bool {
         let substitution: Vec<(&Int, &Int)> = head
             .terms()
-            .zip(self.head_vars.iter())
+            .zip(self.restriction_head_vars.iter())
             .filter_map(|(p, n)| match p {
                 Primitive::Variable(v) => Some((var_cache.get(v).expect("msg"), n)),
                 Ground(_) => None,
