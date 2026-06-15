@@ -61,7 +61,8 @@ impl AnnotationAnalyzer {
     /// Verifies annotations of a program whether they all "support" each other without contradiction
     /// No propagation is done, so most annotations have to be written by user
     pub fn verify_annotations(&mut self) {
-        let verifier = RuleVerifier::new();
+        let mut verifier = RuleVerifier::new();
+        self.goal_propagation(&mut verifier);
 
         for fact in self.program.facts() {
             verifier.verify_facts(fact, self.program());
@@ -81,11 +82,13 @@ impl AnnotationAnalyzer {
                 valid = verifier.verify_rule(self.program(), rule) && valid;
             }
         }
-        // TODO: only check for output predicates
+        for predicate in self.program.output_predicates() {
+            valid = verifier.check_goal_state(predicate) && valid;
+        }
         if valid {
             println!("Annotations could be verified to have no contradictions")
         } else {
-            println!("Contradiction to annotations found")
+            println!("Contradiction to annotations found, maybe increase fuel")
         }
     }
 
@@ -93,7 +96,7 @@ impl AnnotationAnalyzer {
     pub fn goal_propagation(&mut self, verifier: &mut RuleVerifier) {
         let output_predicates = self.program.output_predicates();
 
-        let fuel = 2;
+        let fuel = 10;
 
         let mut changed: HashSet<Tag> = HashSet::new();
         // start with output predicates and turn them into goals
@@ -125,8 +128,6 @@ impl AnnotationAnalyzer {
     /// Do this only if we actually have assertions for output predicate (e.g. for each predicate)
     pub fn propagate_annotations_alt(&mut self) {
         let mut verifier = RuleVerifier::new();
-
-        self.goal_propagation(&mut verifier);
 
         for input_annotation in self.program.input_annotations() {
             verifier.add_restriction_from_input_annotation(input_annotation);

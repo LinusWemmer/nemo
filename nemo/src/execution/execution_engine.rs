@@ -113,7 +113,7 @@ impl<Strategy: RuleSelectionStrategy> ExecutionEngine<Strategy> {
         // Try to verify the program
         log::info!("Analyzing ... ");
         let mut analyzer = AnnotationAnalyzer::new(&normalized_program);
-        analyzer.propagate_annotations_alt();
+        analyzer.verify_annotations();
         log::info!("Analyzing Done ... ");
 
         let mut table_manager = TableManager::new();

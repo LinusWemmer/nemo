@@ -22,12 +22,13 @@ use crate::{
     },
 };
 
-/// Represents the status of the VerificationGoal
-#[derive(Debug, Clone, Copy)]
+/// Represents the status of the VerificationGoal,
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VerificationStatus {
-    /// Goal has been proven at least once, could still be disproven?
+    /// Goal has been proven at least once
+    /// Importantly, it can still be disproven
     Proven,
-    /// Goal has been disproven
+    /// Goal has been disproven, so guaranteed doesn't hold.
     Refuted,
     /// Truth of goal unknown
     Unknown,
@@ -122,9 +123,26 @@ impl VerificationGoal {
 }
 
 impl VerificationGoal {
-    /// Sets the status to verified
+    /// Sets the status to verified if it hasn't been refuted
     pub fn goal_proven(&mut self) {
-        self.status = VerificationStatus::Proven
+        if !(self.status == VerificationStatus::Refuted) {
+            self.status = VerificationStatus::Proven
+        }
+    }
+
+    /// Returns true if the current status of the goal is proven
+    pub fn is_proven(&self) -> bool {
+        self.status == VerificationStatus::Proven
+    }
+
+    /// Returns true if the goal has been refuted
+    pub fn is_refuted(&self) -> bool {
+        self.status == VerificationStatus::Refuted
+    }
+
+    /// Sets the status to refuted
+    pub fn goal_refuted(&mut self) {
+        self.status = VerificationStatus::Refuted;
     }
 }
 
@@ -170,7 +188,7 @@ impl VerificationGoal {
     }
 
     /// Returns proof goal statements for the head atom
-    pub fn goal_from_head(
+    pub fn goal_from_head_atom(
         &self,
         head_atom: &HeadAtom,
         var_cache: &HashMap<Variable, Int>,
@@ -191,6 +209,34 @@ impl VerificationGoal {
                     v_goal.clone(),
                     Int::from_i64(ground_term.value().to_i64_unchecked()),
                 ),
+            })
+            .collect();
+        let sub_ref: Vec<(&Int, &Int)> = substitution.iter().map(|(s, n)| (s, n)).collect();
+
+        self.verification_goals
+            .iter()
+            .map(|g| g.substitute(&sub_ref))
+            .collect()
+    }
+
+    /// Returns proof goal statements for the head atom
+    pub fn goal_from_body_atom(
+        &self,
+        body_atom: &BodyAtom,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Vec<Bool> {
+        let substitution: Vec<(Int, Int)> = self
+            .pos_vars
+            .iter()
+            .zip(body_atom.terms())
+            .map(|(v_goal, v_body)| {
+                (
+                    v_goal.clone(),
+                    var_cache
+                        .get(v_body)
+                        .expect("var should be registered")
+                        .clone(),
+                )
             })
             .collect();
         let sub_ref: Vec<(&Int, &Int)> = substitution.iter().map(|(s, n)| (s, n)).collect();
