@@ -50,6 +50,11 @@ impl RuleVerifier {
         format!("V{}", self.fresh_var_counter)
     }
 
+    /// Returns the verification goals
+    pub fn verification_goals(&self) -> &HashMap<Tag, VerificationGoal> {
+        &self.verification_goals
+    }
+
     /// Creates a map from nemo vars to z3 vars for the rule
     pub fn create_var_cache(rule: &NormalizedRule) -> HashMap<Variable, Int> {
         rule.variables()
@@ -103,10 +108,10 @@ impl RuleVerifier {
                 })
                 .collect();
 
-            let head_goal = head_verification_goal
-                .goal_from_head(&rule.head()[0], &var_cache)
-                .not();
-            // TODO: maybe with implication?
+            let head_goal =
+                Bool::and(&head_verification_goal.goal_from_head(&rule.head()[0], &var_cache))
+                    .not();
+            // TODO: maybe with implication instead of conjuncition
             body_operations.push(head_goal);
 
             let mut added_goals = HashSet::new();
@@ -131,15 +136,18 @@ impl RuleVerifier {
                 if let Some(goal) = result.first() {
                     let filters = goal.get_formulas();
                     if !filters.is_empty() {
+                        // Note: might yield vacuous statements from guards in rule, i.e. goals that would mean the rule doesn't fire
+                        let new_goal: Bool;
+                        if filters.len() == 1 {
+                            new_goal = filters.first().expect("").not();
+                        } else {
+                            new_goal = Bool::and(&filters).not();
+                        }
                         self.verification_goals
                             .entry(body_atom.predicate())
-                            .and_modify(|g| {
-                                g.add_propagated_goal(body_atom, &var_cache, &Bool::and(&filters))
-                            })
+                            .and_modify(|g| g.add_propagated_goal(body_atom, &var_cache, &new_goal))
                             .or_insert(VerificationGoal::new_from_propagation(
-                                body_atom,
-                                &var_cache,
-                                &Bool::and(&filters),
+                                body_atom, &var_cache, &new_goal,
                             ));
                         added_goals.insert(body_atom.predicate());
                     }

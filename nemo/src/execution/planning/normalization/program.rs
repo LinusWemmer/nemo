@@ -40,7 +40,7 @@ pub struct NormalizedProgram {
     /// Input Annotations
     input_annotations: Vec<NormalizedInputAnnotation>,
     /// Type Annotations
-    type_annotations: Vec<NormalizedTypeAnnotation>,
+    //type_annotations: Vec<NormalizedTypeAnnotation>,
 
     /// Predicate arities
     predicate_arities: HashMap<Tag, usize>,

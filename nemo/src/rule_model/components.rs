@@ -12,7 +12,6 @@ pub mod literal;
 pub mod output;
 pub mod parameter;
 pub mod rule;
-pub mod rule_annotation;
 pub mod statement;
 pub mod symbols;
 pub mod tag;

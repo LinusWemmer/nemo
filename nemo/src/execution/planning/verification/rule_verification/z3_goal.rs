@@ -4,19 +4,15 @@ use std::{collections::HashMap, fmt::Display};
 
 use nemo_physical::datavalues::DataValue;
 use z3::{
-    Goal, Solver, Tactic,
+    Goal, Tactic,
     ast::{Ast, Bool, Int},
 };
 
 use crate::{
     execution::planning::{
         normalization::{
-            atom::{
-                body::BodyAtom,
-                head::{self, HeadAtom},
-            },
+            atom::{body::BodyAtom, head::HeadAtom},
             global_annotation::NormalizedGlobalAnnotation,
-            input_annotation::NormalizedInputAnnotation,
         },
         verification::rule_verification::z3_translation::RuleTranslator,
     },
@@ -29,8 +25,11 @@ use crate::{
 /// Represents the status of the VerificationGoal
 #[derive(Debug, Clone, Copy)]
 pub enum VerificationStatus {
+    /// Goal has been proven at least once, could still be disproven?
     Proven,
+    /// Goal has been disproven
     Refuted,
+    /// Truth of goal unknown
     Unknown,
 }
 
@@ -41,7 +40,7 @@ pub struct VerificationGoal {
     pos_vars: Vec<Int>,
     /// Theory for bounds on the head TODO: change to single formula that gets changed &simplified
     /// TODO: maybe vec<Bool>?
-    goals: Bool,
+    verification_goals: Vec<Bool>,
     status: VerificationStatus,
 }
 
@@ -59,7 +58,7 @@ impl VerificationGoal {
             .collect();
 
         let translator = RuleTranslator::new();
-        let body: Vec<Bool> = annotation
+        let goals: Vec<Bool> = annotation
             .body()
             .iter()
             .map(|op| {
@@ -70,11 +69,9 @@ impl VerificationGoal {
             })
             .collect();
 
-        let goal = Bool::and(&body);
-
         Self {
             pos_vars,
-            goals: goal,
+            verification_goals: goals,
             status: VerificationStatus::Unknown,
         }
     }
@@ -99,10 +96,26 @@ impl VerificationGoal {
             })
             .collect();
 
-        let goals = prop_goal.substitute(&substitution);
+        let tactic_simplify = Tactic::new("simplify");
+        let goal = Goal::new(false, false, false);
+
+        let verification_goal = prop_goal.substitute(&substitution);
+        goal.assert(&verification_goal);
+
+        let result: Vec<Goal> = tactic_simplify
+            .apply(&goal, None)
+            .expect("simplify tactic failed")
+            .list_subgoals()
+            .collect();
+
+        let verification_goals = result
+            .first()
+            .expect("simplification should at least yield true or false")
+            .get_formulas();
+
         Self {
             pos_vars,
-            goals,
+            verification_goals,
             status: VerificationStatus::Unknown,
         }
     }
@@ -133,13 +146,35 @@ impl VerificationGoal {
                 )
             })
             .collect();
+
+        let tactic_simplify = Tactic::new("ctx-solver-simplify");
+        let goal = Goal::new(false, false, false);
+
         let new_goal = prop_goal.substitute(&substitution);
-        // TODO: simplify or do emptiness check
-        self.goals = Bool::and(&[&self.goals, &new_goal])
+
+        goal.assert(&new_goal);
+        goal.assert(&Bool::and(&self.verification_goals));
+
+        let result: Vec<Goal> = tactic_simplify
+            .apply(&goal, None)
+            .expect("simplify tactic failed")
+            .list_subgoals()
+            .collect();
+
+        if let Some(goal) = result.first() {
+            let new_goal = goal.get_formulas();
+            self.verification_goals = new_goal;
+        }
+        // TODO: do emptiness check
+        //self.verification_goals.push(new_goal);
     }
 
     /// Returns proof goal statements for the head atom
-    pub fn goal_from_head(&self, head_atom: &HeadAtom, var_cache: &HashMap<Variable, Int>) -> Bool {
+    pub fn goal_from_head(
+        &self,
+        head_atom: &HeadAtom,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Vec<Bool> {
         let substitution: Vec<(Int, Int)> = self
             .pos_vars
             .iter()
@@ -159,6 +194,19 @@ impl VerificationGoal {
             })
             .collect();
         let sub_ref: Vec<(&Int, &Int)> = substitution.iter().map(|(s, n)| (s, n)).collect();
-        self.goals.substitute(&sub_ref)
+
+        self.verification_goals
+            .iter()
+            .map(|g| g.substitute(&sub_ref))
+            .collect()
+    }
+}
+
+impl Display for VerificationGoal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for goal in &self.verification_goals {
+            write!(f, "{}", goal)?;
+        }
+        Ok(())
     }
 }
