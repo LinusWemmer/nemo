@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// Represents the status of the VerificationGoal
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum VerificationStatus {
     Proven,
     Refuted,
@@ -79,7 +79,7 @@ impl VerificationGoal {
         }
     }
 
-    // Creates a goal from unfolding a rule body
+    /// Creates a goal from unfolding a rule body
     pub fn new_from_propagation(
         atom: &BodyAtom,
         var_cache: &HashMap<Variable, Int>,
@@ -116,6 +116,28 @@ impl VerificationGoal {
 }
 
 impl VerificationGoal {
+    /// Adds a goal to the appropriate predicate
+    pub fn add_propagated_goal(
+        &mut self,
+        atom: &BodyAtom,
+        var_cache: &HashMap<Variable, Int>,
+        prop_goal: &Bool,
+    ) {
+        let substitution: Vec<(&Int, &Int)> = atom
+            .terms()
+            .zip(self.pos_vars.iter())
+            .map(|(v_rule, v_pos)| {
+                (
+                    var_cache.get(v_rule).expect("var should be registered"),
+                    v_pos,
+                )
+            })
+            .collect();
+        let new_goal = prop_goal.substitute(&substitution);
+        // TODO: simplify or do emptiness check
+        self.goals = Bool::and(&[&self.goals, &new_goal])
+    }
+
     /// Returns proof goal statements for the head atom
     pub fn goal_from_head(&self, head_atom: &HeadAtom, var_cache: &HashMap<Variable, Int>) -> Bool {
         let substitution: Vec<(Int, Int)> = self

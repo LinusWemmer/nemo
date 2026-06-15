@@ -98,6 +98,7 @@ impl TransformationFilterImports {
                 Statement::Parameter(_) => {}
                 Statement::GlobalAnnotation(_) => {}
                 Statement::InputAnnotation(_) => {}
+                Statement::TypeAnnotation(_) => {}
             }
         }
 

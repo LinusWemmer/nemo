@@ -5,7 +5,7 @@ use std::{collections::HashSet, fmt::Display, hash::Hash};
 use nemo_physical::datavalues::DataValue;
 
 use crate::rule_model::{
-    components::{import_export::clause::ImportClause, term::operation::Operation, rule_annotation::RuleAnnotation},
+    components::{import_export::clause::ImportClause, term::operation::Operation},
     error::{ValidationReport, hint::Hint, info::Info, validation_error::ValidationError},
     origin::Origin,
     pipeline::id::ProgramComponentId,
@@ -49,9 +49,6 @@ pub struct Rule {
 
     /// Imports that are evaluated as part of the rule
     imports: Vec<ImportClause>,
-
-    /// Annotations to this rule
-    annotations: Vec<RuleAnnotation>,
 }
 
 impl Rule {
@@ -65,7 +62,6 @@ impl Rule {
             head,
             body,
             imports: Vec::default(),
-            annotations: Vec::default(),
         }
     }
 
@@ -79,7 +75,6 @@ impl Rule {
             head: Vec::default(),
             body: Vec::default(),
             imports: Vec::default(),
-            annotations: Vec::default(),
         }
     }
 
@@ -154,16 +149,6 @@ impl Rule {
     /// Return a mutable reference to the head of the rule.
     pub fn head_mut(&mut self) -> &mut Vec<Atom> {
         &mut self.head
-    }
-
-    /// Return a reference to the annotations of the rule
-    pub fn annotations(&self) -> &Vec<RuleAnnotation> {
-        &self.annotations
-    }
-
-    /// Return a mutable reference to the annotations of the rule
-    pub fn annotations_mut(&mut self) -> &mut Vec<RuleAnnotation> {
-        &mut self.annotations
     }
 
     /// Return an iterator over all positive and negative [Atom]s

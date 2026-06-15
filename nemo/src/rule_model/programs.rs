@@ -3,7 +3,9 @@
 use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use crate::rule_model::{
-    components::{input_annotation::InputAnnotation, statement::Statement},
+    components::{
+        input_annotation::InputAnnotation, statement::Statement, type_annotation::TypeAnnotation,
+    },
     error::info::Info,
 };
 
@@ -56,13 +58,17 @@ pub trait ProgramWrite {
     fn add_fact(&mut self, fact: Fact) {
         self.add_statement(fact.into());
     }
-    /// Add a new global annotation to this prgoram.
+    /// Add a new global annotation to this program.
     fn add_global_annotation(&mut self, global_annotation: GlobalAnnotation) {
         self.add_statement(global_annotation.into());
     }
-    /// Add a new input annotation to this prgoram.
+    /// Add a new input annotation to this program.
     fn add_input_annotation(&mut self, input_annotation: InputAnnotation) {
         self.add_statement(input_annotation.into());
+    }
+    /// Add a new type annotation to this program
+    fn add_type_annotation(&mut self, type_annotation: TypeAnnotation) {
+        self.add_statement(type_annotation.into());
     }
 }
 

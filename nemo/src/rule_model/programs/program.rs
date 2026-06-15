@@ -7,7 +7,7 @@ use crate::rule_model::{
         ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponent,
         ProgramComponentKind, component_iterator, component_iterator_mut,
         global_annotation::GlobalAnnotation, input_annotation::InputAnnotation, rule::Rule,
-        statement::Statement,
+        statement::Statement, type_annotation::TypeAnnotation,
     },
     error::ValidationReport,
     origin::Origin,
@@ -55,6 +55,14 @@ impl Program {
     pub fn input_annotations(&self) -> impl Iterator<Item = &InputAnnotation> {
         self.statements().filter_map(|statement| match statement {
             Statement::InputAnnotation(input_annotation) => Some(input_annotation),
+            _ => None,
+        })
+    }
+
+    /// Returns the type annotations
+    pub fn type_annotations(&self) -> impl Iterator<Item = &TypeAnnotation> {
+        self.statements().filter_map(|statement| match statement {
+            Statement::TypeAnnotation(type_annotation) => Some(type_annotation),
             _ => None,
         })
     }

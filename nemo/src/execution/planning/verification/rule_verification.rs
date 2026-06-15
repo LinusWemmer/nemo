@@ -81,9 +81,7 @@ impl RuleVerifier {
     pub fn add_output_verification_goal(&mut self, annotation: &NormalizedGlobalAnnotation) {
         let goal = VerificationGoal::new_from_annotation(annotation);
         self.verification_goals
-            .entry(annotation.head().predicate())
-            .and_modify(|g| todo!())
-            .or_insert(goal);
+            .insert(annotation.head().predicate(), goal);
     }
 
     /// Propagates head goals to body, logical and them, sort of like weakest precondition
@@ -132,15 +130,20 @@ impl RuleVerifier {
                     .collect::<Vec<Goal>>();
                 if let Some(goal) = result.first() {
                     let filters = goal.get_formulas();
+                    if !filters.is_empty() {
+                        self.verification_goals
+                            .entry(body_atom.predicate())
+                            .and_modify(|g| {
+                                g.add_propagated_goal(body_atom, &var_cache, &Bool::and(&filters))
+                            })
+                            .or_insert(VerificationGoal::new_from_propagation(
+                                body_atom,
+                                &var_cache,
+                                &Bool::and(&filters),
+                            ));
+                        added_goals.insert(body_atom.predicate());
+                    }
 
-                    self.verification_goals
-                        .entry(body_atom.predicate())
-                        .and_modify(|g| todo!())
-                        .or_insert(VerificationGoal::new_from_propagation(
-                            body_atom,
-                            &var_cache,
-                            &Bool::and(&filters),
-                        ));
                     // add to z3_goal from prop
                 }
             }
@@ -150,7 +153,6 @@ impl RuleVerifier {
     }
 
     /// Verifies a whether a rule satisfies it's annotations
-    /// TODO: probably change to special IH terms
     /// body /\ assertions on body |= assertions on head
     /// TODO: check if body is actually satisfiable without assertion before verifying
     /// returns true if the body hat a valid substitution, false otherwise

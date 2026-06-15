@@ -43,11 +43,6 @@ impl TranslationComponent for Rule {
         if let Some(rule_display) = attributes.get_unique(&KnownAttributes::Display) {
             result.set_display(rule_display[0].clone());
         }
-        
-        let annotations = translation.statement_annotations();
-        for annotation in annotations {
-            result.annotations_mut().push(annotation.clone());
-        }
 
         for expression in rule.head() {
             result

@@ -9,7 +9,6 @@ pub(crate) mod global_annotation;
 pub(crate) mod input_annotation;
 pub(crate) mod literal;
 pub(crate) mod rule;
-pub(crate) mod rule_annotation;
 mod term;
 pub(crate) mod type_annotation;
 
@@ -21,7 +20,6 @@ use std::{
 
 use attribute::{KnownAttributes, process_attributes};
 use directive::{handle_define_directive, handle_use_directive};
-use rule_annotation::process_annotations;
 
 use crate::{
     error::report::ProgramReport,
@@ -90,24 +88,6 @@ impl ASTProgramTranslation {
         }
     }
 
-    /// Process annotations attached to a statement/rule
-    fn process_annotations<'a>(&mut self, statement: &ast::statement::Statement<'a>) {
-        match statement.kind() {
-            ast::statement::StatementKind::Rule(_) => {
-                if let Some(annotations) = process_annotations(self, statement.annotations().iter())
-                {
-                    self.statement_annotations = annotations;
-                }
-            }
-            _ => {
-                if !statement.annotations().is_empty() {
-                    self.report
-                        .add(statement, TranslationError::AnnotateNonRule);
-                }
-            }
-        }
-    }
-
     /// Translate the given [ProgramAST] into a [ProgramWrite].
     pub fn translate<'a, Writer: Debug + ProgramWrite>(
         mut self,
@@ -124,8 +104,6 @@ impl ASTProgramTranslation {
         // Now handle facts and rules
         for statement in ast.statements() {
             self.process_attributes(statement);
-
-            self.process_annotations(statement);
 
             match statement.kind() {
                 ast::statement::StatementKind::Fact(fact) => {
@@ -159,7 +137,7 @@ impl ASTProgramTranslation {
                     if let Some(type_annotation) =
                         TypeAnnotation::build_component(&mut self, type_annotation)
                     {
-                        (); //program.add_type_annotation(type_annotation);
+                        program.add_type_annotation(type_annotation);
                     }
                 }
                 ast::statement::StatementKind::Error(_token) => {

@@ -85,7 +85,8 @@ impl ProgramTransformation for TransformationActive {
                 | Statement::Output(_)
                 | Statement::Parameter(_)
                 | Statement::GlobalAnnotation(_)
-                | Statement::InputAnnotation(_) => commit.keep(statement),
+                | Statement::InputAnnotation(_)
+                | Statement::TypeAnnotation(_) => commit.keep(statement),
             }
         }
 

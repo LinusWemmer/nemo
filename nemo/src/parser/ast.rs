@@ -9,7 +9,6 @@ pub mod guard;
 pub mod input_annotation;
 pub mod program;
 pub mod rule;
-pub mod rule_annotation;
 pub mod sequence;
 pub mod statement;
 pub mod tag;

@@ -31,7 +31,7 @@ use crate::{
         datavalues::{self, RDF_DATATYPE_INDICATOR, boolean, iri, map, string, tuple},
         directive, encoding_prefixes,
         expression::{aggregate, atom, format_string, operation, variable},
-        input_annotation, operator, rule, rule_annotation, type_annotation,
+        input_annotation, operator, rule, type_annotation,
     },
 };
 
@@ -296,12 +296,6 @@ pub enum TokenKind {
     /// Closing token for attributes
     #[assoc(name = rule::CLOSE_ATTRIBUTE)]
     CloseAttribute,
-    /// Opening token annotation
-    #[assoc(name = rule_annotation::OPEN_RULE_ANNOTATION)]
-    OpenRuleAnnotation,
-    /// Closing token for annotation
-    #[assoc(name = rule_annotation::CLOSE_RULE_ANNOTATION)]
-    CloseRuleAnnotation,
     /// Open assert annotation
     #[assoc(name = annotation_global::OPEN_ASSERT)]
     OpenAssert,
@@ -884,8 +878,6 @@ impl<'a> Token<'a> {
     string_token!(namespace_separator, TokenKind::NamespaceSeparator);
     string_token!(open_attribute, TokenKind::OpenAttribute);
     string_token!(close_attribute, TokenKind::CloseAttribute);
-    string_token!(open_rule_annotation, TokenKind::OpenRuleAnnotation);
-    string_token!(close_rule_annotation, TokenKind::CloseRuleAnnotation);
     string_token!(open_type_annotation, TokenKind::OpenType);
     string_token!(open_assert, TokenKind::OpenAssert);
     string_token!(open_input, TokenKind::OpenInput);

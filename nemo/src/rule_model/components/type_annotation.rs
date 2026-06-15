@@ -3,7 +3,10 @@
 use std::{fmt::Display, hash::Hash};
 
 use crate::rule_model::{
-    components::tag::Tag, error::ValidationReport, origin::Origin, pipeline::id::ProgramComponentId,
+    components::{IterablePrimitives, IterableVariables, tag::Tag},
+    error::ValidationReport,
+    origin::Origin,
+    pipeline::id::ProgramComponentId,
 };
 
 use super::{
@@ -108,7 +111,47 @@ impl ComponentIdentity for TypeAnnotation {
     }
 }
 
-impl IterableComponent for TypeAnnotation {}
+impl IterableComponent for TypeAnnotation {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn super::ProgramComponent> + 'a> {
+        Box::new(std::iter::empty())
+    }
+
+    fn children_mut<'a>(
+        &'a mut self,
+    ) -> Box<dyn Iterator<Item = &'a mut dyn super::ProgramComponent> + 'a> {
+        Box::new(std::iter::empty())
+    }
+}
+
+impl IterableVariables for TypeAnnotation {
+    fn variables<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a super::term::primitive::variable::Variable> + 'a> {
+        Box::new(std::iter::empty())
+    }
+
+    fn variables_mut<'a>(
+        &'a mut self,
+    ) -> Box<dyn Iterator<Item = &'a mut super::term::primitive::variable::Variable> + 'a> {
+        Box::new(std::iter::empty())
+    }
+}
+
+impl IterablePrimitives for TypeAnnotation {
+    type TermType = super::term::Term;
+
+    fn primitive_terms<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a super::term::primitive::Primitive> + 'a> {
+        Box::new(std::iter::empty())
+    }
+
+    fn primitive_terms_mut<'a>(
+        &'a mut self,
+    ) -> Box<dyn Iterator<Item = &'a mut Self::TermType> + 'a> {
+        Box::new(std::iter::empty())
+    }
+}
 
 impl Display for TypeAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
