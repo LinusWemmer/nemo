@@ -62,7 +62,7 @@ impl AnnotationAnalyzer {
     /// No propagation is done, so most annotations have to be written by user
     pub fn verify_annotations(&mut self) {
         let mut verifier = RuleVerifier::new();
-        self.goal_propagation(&mut verifier);
+        self.goal_propagation(&mut verifier, 0);
 
         for fact in self.program.facts() {
             verifier.verify_facts(fact, self.program());
@@ -93,10 +93,8 @@ impl AnnotationAnalyzer {
     }
 
     /// Propagates proof goals top down (i.e. from output predicate head to rule bodies)
-    pub fn goal_propagation(&mut self, verifier: &mut RuleVerifier) {
+    pub fn goal_propagation(&mut self, verifier: &mut RuleVerifier, fuel: i32) {
         let output_predicates = self.program.output_predicates();
-
-        let fuel = 10;
 
         let mut changed: HashSet<Tag> = HashSet::new();
         // start with output predicates and turn them into goals
@@ -126,12 +124,14 @@ impl AnnotationAnalyzer {
 
     /// not every derivation step, or otherwise give an inductive or spec predicate
     /// Do this only if we actually have assertions for output predicate (e.g. for each predicate)
-    pub fn propagate_annotations_alt(&mut self) {
+    pub fn verify_with_goal_propagation(&mut self) {
         let mut verifier = RuleVerifier::new();
 
-        for input_annotation in self.program.input_annotations() {
+        /*for input_annotation in self.program.input_annotations() {
             verifier.add_restriction_from_input_annotation(input_annotation);
-        }
+        }*/
+
+        self.goal_propagation(&mut verifier, 10);
 
         for fact in self.program.facts() {
             verifier.verify_facts(fact, self.program());
@@ -144,18 +144,24 @@ impl AnnotationAnalyzer {
         // Do a topological bottom up propagation & verification
         while let Some(scc) = rule_graph.next_scc() {
             let mut delta = true;
-            // repeat in scc until fixpoint reached
             while delta {
                 delta = false;
 
                 for rule_index in &scc {
                     let rule = &self.program.rules()[*rule_index];
                     println!("Checking rule {rule_index}: {rule}");
-                    if verifier.verify_rule(self.program(), rule) {
-                        delta = verifier.propagate_filters(&rule, self.program()) || delta;
-                    }
+                    delta = verifier.verify_with_propagation(self.program(), &rule) || delta;
                 }
             }
+        }
+        let mut valid = true;
+        for predicate in self.program.output_predicates() {
+            valid = verifier.check_goal_state(predicate) && valid;
+        }
+        if valid {
+            println!("Annotations could be verified to have no contradictions")
+        } else {
+            println!("Contradiction to annotations found, maybe increase fuel")
         }
     }
 }

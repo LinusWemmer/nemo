@@ -29,6 +29,8 @@ pub struct Restriction {
     restriction_head_vars: Vec<Int>,
     /// Theory for bounds on the head
     restrictions: Bool,
+    /// Has a counterexample for this restriction been found?
+    refuted: bool,
 }
 
 impl Restriction {
@@ -61,6 +63,7 @@ impl Restriction {
         Self {
             restriction_head_vars: head_vars,
             restrictions: restriction,
+            refuted: false,
         }
     }
 
@@ -87,6 +90,7 @@ impl Restriction {
         Self {
             restriction_head_vars: head_vars,
             restrictions,
+            refuted: false,
         }
     }
 
@@ -108,6 +112,16 @@ impl Restriction {
             })
             .collect();
         self.restrictions.substitute(&substitution)
+    }
+
+    /// Returns true if a counterexample for the restriction was found
+    pub fn is_refuted(&self) -> bool {
+        self.refuted
+    }
+
+    /// Marks the restriction as disproven
+    pub fn restriction_refuted(&mut self) {
+        self.refuted = true
     }
 
     /// Checks whether a new restriction actually gives new entailments

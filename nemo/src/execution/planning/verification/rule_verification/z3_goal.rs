@@ -40,8 +40,8 @@ pub struct VerificationGoal {
     /// Variable names in restriction
     pos_vars: Vec<Int>,
     /// Theory for bounds on the head TODO: change to single formula that gets changed &simplified
-    /// TODO: maybe vec<Bool>?
     verification_goals: Vec<Bool>,
+    /// The current status of proving the goal
     status: VerificationStatus,
 }
 
@@ -124,10 +124,13 @@ impl VerificationGoal {
 
 impl VerificationGoal {
     /// Sets the status to verified if it hasn't been refuted
-    pub fn goal_proven(&mut self) {
-        if !(self.status == VerificationStatus::Refuted) {
-            self.status = VerificationStatus::Proven
+    /// returns true if the status changed
+    pub fn goal_proven(&mut self) -> bool {
+        if self.status == VerificationStatus::Unknown {
+            self.status = VerificationStatus::Proven;
+            return true;
         }
+        false
     }
 
     /// Returns true if the current status of the goal is proven
@@ -135,14 +138,18 @@ impl VerificationGoal {
         self.status == VerificationStatus::Proven
     }
 
+    /// Sets the status to refuted, returns true if something changed
+    pub fn goal_refuted(&mut self) -> bool {
+        if self.status == VerificationStatus::Refuted {
+            return false;
+        }
+        self.status = VerificationStatus::Refuted;
+        true
+    }
+
     /// Returns true if the goal has been refuted
     pub fn is_refuted(&self) -> bool {
         self.status == VerificationStatus::Refuted
-    }
-
-    /// Sets the status to refuted
-    pub fn goal_refuted(&mut self) {
-        self.status = VerificationStatus::Refuted;
     }
 }
 
