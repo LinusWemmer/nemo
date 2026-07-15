@@ -1,4 +1,4 @@
-//! This module defines [ExpressionSequenceSimple].
+//! This module defines [TypeLiteralSequence].
 
 use std::vec::IntoIter;
 

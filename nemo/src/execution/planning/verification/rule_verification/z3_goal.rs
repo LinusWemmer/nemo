@@ -97,7 +97,7 @@ impl VerificationGoal {
             })
             .collect();
 
-        let tactic_simplify = Tactic::new("simplify");
+        let tactic_simplify = Tactic::new("ctx-solver-simplify");
         let goal = Goal::new(false, false, false);
 
         let verification_goal = prop_goal.substitute(&substitution);
@@ -108,7 +108,6 @@ impl VerificationGoal {
             .expect("simplify tactic failed")
             .list_subgoals()
             .collect();
-
         let verification_goals = result
             .first()
             .expect("simplification should at least yield true or false")

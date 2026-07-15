@@ -2,10 +2,7 @@
 #![allow(missing_docs)]
 
 use enum_assoc::Assoc;
-use nom::{
-    branch::alt,
-    combinator::map,
-};
+use nom::{branch::alt, combinator::map};
 
 use crate::parser::{
     ParserResult,
@@ -21,19 +18,55 @@ use crate::parser::{
 /// Marker that indicates the type of variable
 #[derive(Assoc, Debug, Clone, Copy, PartialEq, Eq)]
 #[func(pub fn token(token: TokenKind) -> Option<Self>)]
-pub enum Sort{
-    /// Universal variable
+pub enum Sort {
+    /// Integer type
     #[assoc(token = TokenKind::TypeIndicatorInt)]
     TypeInt,
-    /// Existential variable
+    /// Float type
     #[assoc(token = TokenKind::TypeIndicatorFloat)]
     TypeFloat,
-    /// Global variable
+    /// String type
     #[assoc(token = TokenKind::TypeIndicatorString)]
     TypeString,
-    /// Anonymous variable
-    #[assoc(token = TokenKind::AnonVal)]
-    TypeAnonymous,
+    /// Language tagged string type
+    #[assoc(token = TokenKind::TypeIndicatorLanguageTaggedString)]
+    TypeLanguageTaggedString,
+    /// IRI type
+    #[assoc(token = TokenKind::TypeIndicatorIri)]
+    TypeIri,
+    /// Double type
+    #[assoc(token = TokenKind::TypeIndicatorDouble)]
+    TypeDouble,
+    /// Unsigned long type
+    #[assoc(token = TokenKind::TypeIndicatorUnsignedLong)]
+    TypeUnsignedLong,
+    /// Non-negative long type
+    #[assoc(token = TokenKind::TypeIndicatorNonNegativeLong)]
+    TypeNonNegativeLong,
+    /// Unsigned int type
+    #[assoc(token = TokenKind::TypeIndicatorUnsignedInt)]
+    TypeUnsignedInt,
+    /// Non-negative int type
+    #[assoc(token = TokenKind::TypeIndicatorNonNegativeInt)]
+    TypeNonNegativeInt,
+    /// Long type
+    #[assoc(token = TokenKind::TypeIndicatorLong)]
+    TypeLong,
+    /// Tuple type
+    #[assoc(token = TokenKind::TypeIndicatorTuple)]
+    TypeTuple,
+    /// Map type
+    #[assoc(token = TokenKind::TypeIndicatorMap)]
+    TypeMap,
+    /// Boolean type
+    #[assoc(token = TokenKind::TypeIndicatorBoolean)]
+    TypeBoolean,
+    /// Null type
+    #[assoc(token = TokenKind::TypeIndicatorNull)]
+    TypeNull,
+    /// Other type
+    #[assoc(token = TokenKind::TypeIndicatorOther)]
+    TypeOther,
 }
 
 /// AST node representing a variable
@@ -47,7 +80,6 @@ pub struct TypeLiteral<'a> {
 }
 
 impl<'a> TypeLiteral<'a> {
-
     /// Return the type of variable
     pub fn sort(&self) -> Sort {
         self.sort
@@ -55,24 +87,27 @@ impl<'a> TypeLiteral<'a> {
 
     /// Parse a named variable
     fn parse_type(input: ParserInput<'a>) -> ParserResult<'a, Sort> {
-
         map(
             alt((
                 Token::type_indicator_int,
                 Token::type_indicator_float,
-                Token::type_indicator_strig
+                Token::type_indicator_string,
+                Token::type_indicator_language_tagged_string,
+                Token::type_indicator_iri,
+                Token::type_indicator_double,
+                Token::type_indicator_unsigned_long,
+                Token::type_indicator_non_negative_long,
+                Token::type_indicator_unsigned_int,
+                Token::type_indicator_non_negative_int,
+                Token::type_indicator_long,
+                Token::type_indicator_tuple,
+                Token::type_indicator_map,
+                Token::type_indicator_boolean,
+                Token::type_indicator_null,
+                Token::type_indicator_other,
             )),
-            |indicator| {
-                Sort::token(indicator.kind()).expect("unknown variable indicator")
-            },
+            |indicator| Sort::token(indicator.kind()).expect("unknown variable indicator"),
         )(input)
-    }
-
-    /// Parse an anonymous variable
-    fn parse_anonymous_type(input: ParserInput<'a>) -> ParserResult<'a, Sort> {
-        map(Token::underscore, |indicator| {
-            Sort::token(indicator.kind()).expect("unknown variable indicator")
-        })(input)
     }
 }
 
@@ -93,14 +128,7 @@ impl<'a> ProgramAST<'a> for TypeLiteral<'a> {
     {
         let input_span = input.span;
 
-        context(
-            CONTEXT,
-            alt((
-                map(Self::parse_type, |typ| typ),
-                map(Self::parse_anonymous_type, |typ| typ),
-            )),
-        )(input)
-        .map(|(rest, sort)| {
+        context(CONTEXT, map(Self::parse_type, |typ| typ))(input).map(|(rest, sort)| {
             let rest_span = rest.span;
 
             (
@@ -133,16 +161,7 @@ mod test {
 
     #[test]
     fn parse_type_literal() {
-        let test = vec![
-            (
-                "int",
-                (Sort::TypeInt),
-            ),
-            (
-                "str",
-                (Sort::TypeString),
-            ),
-        ];
+        let test = vec![("int", (Sort::TypeInt)), ("str", (Sort::TypeString))];
 
         for (input, expected) in test {
             let parser_input = ParserInput::new(input, ParserState::default());

@@ -2,6 +2,8 @@
 
 use std::{fmt::Display, hash::Hash};
 
+use nemo_physical::datavalues::ValueDomain;
+
 use crate::rule_model::{
     components::{IterablePrimitives, IterableVariables, tag::Tag},
     error::ValidationReport,
@@ -13,28 +15,6 @@ use super::{
     ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponentKind,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
-pub enum Sort {
-    TypeInt,
-    /// Existential variable
-    TypeFloat,
-    /// Global variable
-    TypeString,
-    /// Anonymous variable
-    TypeAnonymous,
-}
-
-impl Display for Sort {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Sort::TypeInt => write!(f, "int"),
-            Sort::TypeFloat => write!(f, "float"),
-            Sort::TypeString => write!(f, "str"),
-            Sort::TypeAnonymous => write!(f, "_"),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct TypeAnnotation {
     /// Origin of this component
@@ -43,18 +23,18 @@ pub struct TypeAnnotation {
     id: ProgramComponentId,
     /// predicate of the annotation
     predicate: Tag,
-    /// body of the annotation
-    body: Vec<Sort>,
+    /// sorts of the annotation
+    sorts: Vec<ValueDomain>,
 }
 
 impl TypeAnnotation {
     /// Create a new [TypeAnnotation].
-    pub fn new(predicate: Tag, body: Vec<Sort>) -> Self {
+    pub fn new(predicate: Tag, sorts: Vec<ValueDomain>) -> Self {
         Self {
             origin: Origin::Created,
             id: ProgramComponentId::default(),
             predicate,
-            body,
+            sorts,
         }
     }
 
@@ -63,14 +43,14 @@ impl TypeAnnotation {
         &self.predicate
     }
 
-    /// Return the body of the operations
-    pub fn body(&self) -> &Vec<Sort> {
-        &self.body
+    /// Return the sorts of the operations
+    pub fn sorts(&self) -> &Vec<ValueDomain> {
+        &self.sorts
     }
 
     /// Return a mutable reference to the operations as mut
-    pub fn body_mut(&mut self) -> &mut Vec<Sort> {
-        &mut self.body
+    pub fn sorts_mut(&mut self) -> &mut Vec<ValueDomain> {
+        &mut self.sorts
     }
 }
 
@@ -159,10 +139,27 @@ impl Display for TypeAnnotation {
         let pred = &self.predicate.to_string();
         write!(f, "{pred} ( ")?;
 
-        for (index, op_literal) in self.body.iter().enumerate() {
-            write!(f, "{op_literal}")?;
+        for (index, sort) in self.sorts.iter().enumerate() {
+            match sort {
+                ValueDomain::PlainString => write!(f, "string")?,
+                ValueDomain::LanguageTaggedString => write!(f, "language-tagged string")?,
+                ValueDomain::Iri => write!(f, "iri")?,
+                ValueDomain::Float => write!(f, "float")?,
+                ValueDomain::Double => write!(f, "double")?,
+                ValueDomain::UnsignedLong => write!(f, "unsigned long")?,
+                ValueDomain::NonNegativeLong => write!(f, "non-negative long")?,
+                ValueDomain::UnsignedInt => write!(f, "unsigned int")?,
+                ValueDomain::NonNegativeInt => write!(f, "non-negative int")?,
+                ValueDomain::Long => write!(f, "long")?,
+                ValueDomain::Int => write!(f, "int")?,
+                ValueDomain::Tuple => write!(f, "tuple")?,
+                ValueDomain::Map => write!(f, "map")?,
+                ValueDomain::Boolean => write!(f, "boolean")?,
+                ValueDomain::Null => write!(f, "null")?,
+                ValueDomain::Other => write!(f, "other")?,
+            }
 
-            if index < self.body.len() - 1 {
+            if index < self.sorts.len() - 1 {
                 f.write_str(", ")?;
             }
         }
@@ -172,7 +169,7 @@ impl Display for TypeAnnotation {
 
 impl PartialEq for TypeAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.predicate == other.predicate && self.body == other.body
+        self.predicate == other.predicate && self.sorts == other.sorts
     }
 }
 
@@ -181,6 +178,6 @@ impl Eq for TypeAnnotation {}
 impl Hash for TypeAnnotation {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.predicate.hash(state);
-        self.body.hash(state);
+        self.sorts.hash(state);
     }
 }

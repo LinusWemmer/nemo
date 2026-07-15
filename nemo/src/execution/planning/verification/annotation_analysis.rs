@@ -19,6 +19,7 @@ use crate::{
 };
 
 //pub mod analysis_report;
+//pub mod postions_dependency_graph;
 pub mod rule_selection;
 
 /// Analyzes the given annotations
@@ -62,7 +63,6 @@ impl AnnotationAnalyzer {
     /// No propagation is done, so most annotations have to be written by user
     pub fn verify_annotations(&mut self) {
         let mut verifier = RuleVerifier::new();
-        self.goal_propagation(&mut verifier, 0);
 
         for fact in self.program.facts() {
             verifier.verify_facts(fact, self.program());
@@ -82,13 +82,10 @@ impl AnnotationAnalyzer {
                 valid = verifier.verify_rule(self.program(), rule) && valid;
             }
         }
-        for predicate in self.program.output_predicates() {
-            valid = verifier.check_goal_state(predicate) && valid;
-        }
         if valid {
             println!("Annotations could be verified to have no contradictions")
         } else {
-            println!("Contradiction to annotations found, maybe increase fuel")
+            println!("Contradiction to annotations found.")
         }
     }
 
@@ -107,6 +104,9 @@ impl AnnotationAnalyzer {
         }
         for i in 0..fuel {
             let mut new_goals: HashSet<Tag> = HashSet::new();
+            if changed.is_empty() {
+                break;
+            }
             for predicate in changed {
                 for index in self.program.rules_with_head_predicate(&predicate) {
                     let rule = &self.program.rules()[index];
@@ -126,10 +126,6 @@ impl AnnotationAnalyzer {
     /// Do this only if we actually have assertions for output predicate (e.g. for each predicate)
     pub fn verify_with_goal_propagation(&mut self) {
         let mut verifier = RuleVerifier::new();
-
-        /*for input_annotation in self.program.input_annotations() {
-            verifier.add_restriction_from_input_annotation(input_annotation);
-        }*/
 
         self.goal_propagation(&mut verifier, 10);
 
@@ -162,6 +158,42 @@ impl AnnotationAnalyzer {
             println!("Annotations could be verified to have no contradictions")
         } else {
             println!("Contradiction to annotations found, maybe increase fuel")
+        }
+    }
+
+    /// Verifies and propagates forward any known annotations
+    pub fn verify_with_forward_propagation(&mut self) {
+        let mut verifier = RuleVerifier::new();
+        for fact in self.program.facts() {
+            verifier.verify_facts(fact, self.program());
+        }
+
+        let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
+            self.program.rules().iter().collect(),
+        );
+
+        // Do a topological bottom up propagation & verification
+        while let Some(scc) = rule_graph.next_scc() {
+            if scc.len() == 1 {
+                let rule = &self.program.rules()[scc[0]];
+                if !rule.is_recursive() {
+                    verifier.verify_with_restrictions(self.program(), &rule);
+                    verifier.forward_propagation(self.program(), &rule);
+                }
+            } else {
+            }
+            let mut delta = true;
+            while delta {
+                //TODO: put back delta maybe
+                delta = false;
+
+                for rule_index in &scc {
+                    let rule = &self.program.rules()[*rule_index];
+                    println!("Checking rule {rule_index}: {rule}");
+                    //TODO: do check whether recursive, don't do scc, but topological rule sort
+                    verifier.verify_with_restrictions(self.program(), &rule);
+                }
+            }
         }
     }
 }

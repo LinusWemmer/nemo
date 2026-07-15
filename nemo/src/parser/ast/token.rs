@@ -308,12 +308,51 @@ pub enum TokenKind {
     /// Indicate Integer Type
     #[assoc(name = type_annotation::TYPE_INDICATOR_INT)]
     TypeIndicatorInt,
-    /// Indicate Integer Type
+    /// Indicate Float Type
     #[assoc(name = type_annotation::TYPE_INDICATOR_FLOAT)]
     TypeIndicatorFloat,
-    /// Indicate Integer Type
+    /// Indicate String Type
     #[assoc(name = type_annotation::TYPE_INDICATOR_STRING)]
     TypeIndicatorString,
+    /// Indicate Language Tagged String Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_LANGUAGE_TAGGED_STRING)]
+    TypeIndicatorLanguageTaggedString,
+    /// Indicate IRI Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_IRI)]
+    TypeIndicatorIri,
+    /// Indicate Double Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_DOUBLE)]
+    TypeIndicatorDouble,
+    /// Indicate Unsigned Long Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_UNSIGNED_LONG)]
+    TypeIndicatorUnsignedLong,
+    /// Indicate Non-Negative Long Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_NON_NEGATIVE_LONG)]
+    TypeIndicatorNonNegativeLong,
+    /// Indicate Unsigned Int Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_UNSIGNED_INT)]
+    TypeIndicatorUnsignedInt,
+    /// Indicate Non-Negative Int Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_NON_NEGATIVE_INT)]
+    TypeIndicatorNonNegativeInt,
+    /// Indicate Long Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_LONG)]
+    TypeIndicatorLong,
+    /// Indicate Tuple Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_TUPLE)]
+    TypeIndicatorTuple,
+    /// Indicate Map Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_MAP)]
+    TypeIndicatorMap,
+    /// Indicate Boolean Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_BOOLEAN)]
+    TypeIndicatorBoolean,
+    /// Indicate Null Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_NULL)]
+    TypeIndicatorNull,
+    /// Indicate Other Type
+    #[assoc(name = type_annotation::TYPE_INDICATOR_OTHER)]
+    TypeIndicatorOther,
     /// Annotation Seperator
     #[assoc(name= annotation_global::ANNOTATION_SEPERATOR)]
     AnnotationSeperator,
@@ -890,7 +929,35 @@ impl<'a> Token<'a> {
     string_token!(name_datatype_separator, TokenKind::NameDatatypeSeparator);
     string_token!(type_indicator_int, TokenKind::TypeIndicatorInt);
     string_token!(type_indicator_float, TokenKind::TypeIndicatorFloat);
-    string_token!(type_indicator_strig, TokenKind::TypeIndicatorString);
+    string_token!(type_indicator_string, TokenKind::TypeIndicatorString);
+    string_token!(
+        type_indicator_language_tagged_string,
+        TokenKind::TypeIndicatorLanguageTaggedString
+    );
+    string_token!(type_indicator_iri, TokenKind::TypeIndicatorIri);
+    string_token!(type_indicator_double, TokenKind::TypeIndicatorDouble);
+    string_token!(
+        type_indicator_unsigned_long,
+        TokenKind::TypeIndicatorUnsignedLong
+    );
+    string_token!(
+        type_indicator_non_negative_long,
+        TokenKind::TypeIndicatorNonNegativeLong
+    );
+    string_token!(
+        type_indicator_unsigned_int,
+        TokenKind::TypeIndicatorUnsignedInt
+    );
+    string_token!(
+        type_indicator_non_negative_int,
+        TokenKind::TypeIndicatorNonNegativeInt
+    );
+    string_token!(type_indicator_long, TokenKind::TypeIndicatorLong);
+    string_token!(type_indicator_tuple, TokenKind::TypeIndicatorTuple);
+    string_token!(type_indicator_map, TokenKind::TypeIndicatorMap);
+    string_token!(type_indicator_boolean, TokenKind::TypeIndicatorBoolean);
+    string_token!(type_indicator_null, TokenKind::TypeIndicatorNull);
+    string_token!(type_indicator_other, TokenKind::TypeIndicatorOther);
 }
 
 #[cfg(test)]

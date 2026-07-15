@@ -91,6 +91,7 @@ impl RuleVerifier {
     }
 
     /// Propagates head goals to body, logical and them, sort of like weakest precondition
+    /// Returns all predicates for that new goals were generated
     pub fn backward_prop_goals(&mut self, predicate: &Tag, rule: &NormalizedRule) -> HashSet<Tag> {
         if let Some(head_verification_goal) = self.verification_goals.get(predicate) {
             let translator = RuleTranslator::new();
@@ -121,13 +122,12 @@ impl RuleVerifier {
             for body_atom in rule.positive() {
                 let goal = Goal::new(false, false, false);
                 let atom_vars_set: HashSet<&Variable> = body_atom.terms().collect();
-                let args: Vec<&dyn Ast> = rule
-                    .variables()
-                    .filter(|v| !atom_vars_set.contains(v))
+                let rule_vars: HashSet<&Variable> = rule.variables().collect();
+                let args: Vec<&dyn Ast> = rule_vars
+                    .difference(&atom_vars_set)
                     .map(|v| var_cache.get(v).expect("variable should be registered"))
                     .map(|v| -> &dyn Ast { v })
                     .collect();
-
                 goal.assert(&exists_const(&args, &[], &Bool::and(&body_operations)));
                 let result = tactic_qe
                     .apply(&goal, None)
@@ -163,22 +163,12 @@ impl RuleVerifier {
 
     /// Verifies a whether a rule satisfies it's annotations
     /// returns true if the annotations could be verified
-    /// Also checks goals, and marks them disproven, but doesn't use that info itself
     pub fn verify_rule(&mut self, program: &NormalizedProgram, rule: &NormalizedRule) -> bool {
         let solver = Solver::new();
 
-        let bool_sort = Sort::bool();
-        let int_sort = Sort::int();
-        // Register all predicates of the rule
-        let mut predicate_to_z3_fun: HashMap<Tag, FuncDecl> = HashMap::new();
-        for (tag, arity) in rule.predicates() {
-            let args_sort = vec![&int_sort; arity];
-            let pred = FuncDecl::new(tag.name(), &args_sort, &bool_sort);
-            predicate_to_z3_fun.insert(tag, pred);
-        }
         let var_cache = RuleVerifier::create_var_cache(rule);
 
-        let translator = RuleTranslator::new_with_predicates(predicate_to_z3_fun);
+        let translator = RuleTranslator::new();
 
         // Translate rule body
         let body_instance = translator.translate_rule(rule, &var_cache, program);
@@ -189,21 +179,7 @@ impl RuleVerifier {
         let mut valid = true;
         let head = &rule.head()[0];
 
-        // TODO: maybe we need to check if the rule could even fire before verifying
-        if let Some(verification_goal) = self.verification_goals.get_mut(&head.predicate()) {
-            if !verification_goal.is_refuted() {
-                solver.push();
-                let proof_goal = verification_goal.goal_from_head_atom(&head, &var_cache);
-                solver.assert(&Bool::and(&proof_goal).not());
-                match solver.check() {
-                    z3::SatResult::Unsat => _ = verification_goal.goal_proven(),
-                    z3::SatResult::Unknown => println!("Could not validate (unknown)"),
-                    z3::SatResult::Sat => _ = verification_goal.goal_refuted(),
-                }
-                solver.pop(1);
-            }
-        }
-        // check all annotations
+        // Check all annotations for the head
         for head_atom_assertion in program.predicate_to_global_annotation(&head.predicate()) {
             solver.push();
             let head_assertion =
@@ -228,7 +204,7 @@ impl RuleVerifier {
                         .collect::<Vec<_>>()
                         .join(", ");
                     println!(
-                        "Rule {} might lead to violation of {} with var assigment {}, ",
+                        "Rule {} might lead to violation of {} with var assigment {}. ",
                         rule, head_atom_assertion, var_interpretation
                     );
                     valid = false;
@@ -357,5 +333,128 @@ impl RuleVerifier {
         }
 
         delta
+    }
+
+    /// verifies a rule and propagates restriction from the body to the head
+    pub fn forward_propagation(&mut self, program: &NormalizedProgram, rule: &NormalizedRule) {
+        let goal = Goal::new(false, false, false);
+        let tactic_qe = Tactic::new("qe");
+
+        let translator = RuleTranslator::new();
+        let var_cache = RuleVerifier::create_var_cache(rule);
+
+        // Translate rule body
+        let mut body_instance = translator.translate_rule(rule, &var_cache, program);
+        let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
+            self.predicate_restrictions
+                .get(&body_atom.predicate())
+                .and_then(|res| Some(res.get_restrictions_for_body(body_atom, &var_cache)))
+        });
+        body_instance.extend(body_restrictions);
+
+        let head = &rule.head()[0];
+
+        let rule_variables: HashSet<&Variable> = rule.variables().collect();
+        let head_variables: HashSet<&Variable> = head.variables().collect();
+        let args: Vec<&dyn Ast> = rule_variables
+            .difference(&head_variables)
+            .map(|v| var_cache.get(v).expect("variable should be registered"))
+            .map(|v| -> &dyn Ast { v })
+            .collect();
+
+        goal.assert(&exists_const(&args, &[], &Bool::and(&body_instance)));
+        let result = tactic_qe
+            .apply(&goal, None)
+            .expect("qe tactic failed")
+            .list_subgoals()
+            .collect::<Vec<Goal>>();
+
+        if let Some(goal) = result.first() {
+            println!("{}", goal.to_string());
+            let new_restriction = goal.get_formulas();
+            if !new_restriction.is_empty() {
+                let head_res: Bool;
+                if new_restriction.len() == 1 {
+                    head_res = new_restriction.first().expect("").clone();
+                } else {
+                    head_res = Bool::and(&new_restriction);
+                }
+                self.predicate_restrictions
+                    .entry(head.predicate())
+                    .and_modify(|res| {
+                        res.add_restriction_from_propagation(head, &var_cache, &head_res);
+                    })
+                    .or_insert(Restriction::new_from_propagation(
+                        head, &var_cache, &head_res,
+                    ));
+            }
+        }
+    }
+
+    /// Verifies a rule like the function verify_rule, but includes possible propagated restrictions from the rule body
+    pub fn verify_with_restrictions(
+        &mut self,
+        program: &NormalizedProgram,
+        rule: &NormalizedRule,
+    ) -> bool {
+        let solver = Solver::new();
+
+        let var_cache = RuleVerifier::create_var_cache(rule);
+
+        let translator = RuleTranslator::new();
+
+        // Translate rule body
+        let body_instance = translator.translate_rule(rule, &var_cache, program);
+        for term in body_instance {
+            solver.assert(term);
+        }
+
+        let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
+            self.predicate_restrictions
+                .get(&body_atom.predicate())
+                .and_then(|res| Some(res.get_restrictions_for_body(body_atom, &var_cache)))
+        });
+        for op in body_restrictions {
+            solver.assert(op);
+        }
+
+        let mut valid = true;
+        let head = &rule.head()[0];
+
+        // Check all annotations for the head
+        for head_atom_assertion in program.predicate_to_global_annotation(&head.predicate()) {
+            solver.push();
+            let head_assertion =
+                translator.translate_head_assertion(head_atom_assertion, head, &var_cache);
+            solver.assert(&head_assertion.not());
+            match solver.check() {
+                z3::SatResult::Unsat => {
+                    println!("Validated: spec for {head_atom_assertion} holds");
+                    valid = valid && true
+                }
+                z3::SatResult::Unknown => println!("Could not validate (unknown)"),
+                z3::SatResult::Sat => {
+                    let model = solver.get_model().expect("Sat model should exist");
+                    let var_interpretation: String = head
+                        .variables()
+                        .map(|v| {
+                            let inter = model
+                                .get_const_interp(var_cache.get(v).expect("Var should be in cache"))
+                                .expect("Counterexample should exist for violation");
+                            format!("{} : {}", v, inter)
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    println!(
+                        "Rule {} might lead to violation of {} with var assigment {}. ",
+                        rule, head_atom_assertion, var_interpretation
+                    );
+                    valid = false;
+                }
+            }
+            solver.pop(1);
+        }
+
+        valid
     }
 }

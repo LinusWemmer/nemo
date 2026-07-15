@@ -14,6 +14,7 @@ use crate::{
             atom::ground::GroundAtom, export::ExportInstruction,
             global_annotation::NormalizedGlobalAnnotation, import::ImportInstruction,
             input_annotation::NormalizedInputAnnotation, rule::NormalizedRule,
+            type_annotation::NormalizedTypeAnnotation,
         },
     },
     rule_model::{
@@ -40,7 +41,7 @@ pub struct NormalizedProgram {
     /// Input Annotations
     input_annotations: Vec<NormalizedInputAnnotation>,
     /// Type Annotations
-    //type_annotations: Vec<NormalizedTypeAnnotation>,
+    type_annotations: Vec<NormalizedTypeAnnotation>,
 
     /// Predicate arities
     predicate_arities: HashMap<Tag, usize>,
@@ -133,6 +134,11 @@ impl NormalizedProgram {
         &self.global_annotations
     }
 
+    /// Return a list of all type annotation of this program
+    pub fn type_annotations(&self) -> &Vec<NormalizedTypeAnnotation> {
+        &self.type_annotations
+    }
+
     /// Return a list of the input annotations of this program
     pub fn input_annotations(&self) -> &Vec<NormalizedInputAnnotation> {
         &self.input_annotations
@@ -149,14 +155,27 @@ impl NormalizedProgram {
             .collect()
     }
 
+    /// Return all global annotations for the given predicate
+    pub fn predicate_to_type_annotation(&self, predicate: &Tag) -> Vec<&NormalizedTypeAnnotation> {
+        self.type_annotations
+            .iter()
+            .filter(|annotation| &annotation.predicate() == predicate)
+            .collect()
+    }
+
     /// Add a global annotation to the normalized program
     pub fn add_global_annotation(&mut self, annotation: NormalizedGlobalAnnotation) {
         self.global_annotations.push(annotation)
     }
 
-    /// Add a global annotation to the normalized program
+    /// Add an input annotation to the normalized program
     pub fn add_input_annotation(&mut self, annotation: NormalizedInputAnnotation) {
         self.input_annotations.push(annotation)
+    }
+
+    /// Add a type annotation to the normalized program
+    pub fn add_type_annotation(&mut self, annotation: NormalizedTypeAnnotation) {
+        self.type_annotations.push(annotation)
     }
 
     /// Return a list of output predicates contained in this program.
@@ -307,6 +326,13 @@ impl NormalizedProgram {
             let normalized_annotation =
                 NormalizedInputAnnotation::normalize_input_annotation(annotation);
             result.add_input_annotation(normalized_annotation);
+        }
+
+        // Handle type annotations
+        for annotation in program.type_annotations() {
+            let normalized_annotation =
+                NormalizedTypeAnnotation::normalize_type_annotation(annotation);
+            result.add_type_annotation(normalized_annotation);
         }
 
         // Handle imports

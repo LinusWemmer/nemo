@@ -222,7 +222,7 @@ impl RuleTranslator {
         Bool::and(&body_constraints)
     }
 
-    /// Translate a (normalized) rule (TODO: handle predicates with cache)
+    /// Translate a (normalized) rule
     pub fn translate_rule(
         &self,
         rule: &NormalizedRule,
@@ -233,8 +233,8 @@ impl RuleTranslator {
 
         //TODO: should this be moved to the verification, i.e. rule and assertion seperately?
         for atom in rule.positive() {
-            let smt_atom = self.translate_body_atom(atom, &var_cache);
-            body_terms.push(smt_atom);
+            //let smt_atom = self.translate_body_atom(atom, &var_cache);
+            //body_terms.push(smt_atom); TODO: maybe still neccesary?
 
             body_terms.extend(
                 program
@@ -244,7 +244,7 @@ impl RuleTranslator {
             );
         }
 
-        // test if this is computationally feasable
+        // test if this is computationally feasible
         let body_operations = rule.operations().iter().map(|b| {
             self.translate_operation(b, &var_cache)
                 .as_bool()
