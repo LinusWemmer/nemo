@@ -7,9 +7,12 @@ use crate::{
         planning::{
             normalization::{
                 global_annotation::NormalizedGlobalAnnotation, program::NormalizedProgram,
+                rule::NormalizedRule,
             },
             verification::{
-                annotation_analysis::rule_selection::RuleAnalysisGraph,
+                annotation_analysis::{
+                    propagation_graph::PropagationGraph, rule_selection::RuleAnalysisGraph,
+                },
                 rule_verification::RuleVerifier,
             },
         },
@@ -19,7 +22,7 @@ use crate::{
 };
 
 //pub mod analysis_report;
-//pub mod postions_dependency_graph;
+pub mod propagation_graph;
 pub mod rule_selection;
 
 /// Analyzes the given annotations
@@ -172,6 +175,9 @@ impl AnnotationAnalyzer {
             self.program.rules().iter().collect(),
         );
 
+        let rules: Vec<&NormalizedRule> = self.program.rules().iter().collect();
+        let graph = PropagationGraph::build_graph(&rules);
+        graph.print_graph();
         // Do a topological bottom up propagation & verification
         while let Some(scc) = rule_graph.next_scc() {
             if scc.len() == 1 {

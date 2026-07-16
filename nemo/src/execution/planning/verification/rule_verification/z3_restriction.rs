@@ -148,6 +148,7 @@ impl Restriction {
         if !self.check_new_entailment(&new_restrictions) {
             return false;
         }
+        //TODO: maybe don't simplify?
         goal.assert(&Bool::or(&[&self.restrictions, &new_restrictions]));
 
         let result = tactic_simplify
@@ -158,7 +159,7 @@ impl Restriction {
 
         if let Some(goal) = result.first() {
             self.restrictions = Bool::and(&goal.get_formulas());
-            println!("simplified formulas:{:#?}", goal.get_formulas())
+            //println!("simplified formulas:{:#?}", goal.get_formulas())
         }
         true
     }

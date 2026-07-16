@@ -370,7 +370,6 @@ impl RuleVerifier {
             .collect::<Vec<Goal>>();
 
         if let Some(goal) = result.first() {
-            println!("{}", goal.to_string());
             let new_restriction = goal.get_formulas();
             if !new_restriction.is_empty() {
                 let head_res: Bool;
@@ -412,7 +411,10 @@ impl RuleVerifier {
         let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
             self.predicate_restrictions
                 .get(&body_atom.predicate())
-                .and_then(|res| Some(res.get_restrictions_for_body(body_atom, &var_cache)))
+                .and_then(|res| {
+                    println!("{body_atom} restriction: {res}");
+                    Some(res.get_restrictions_for_body(body_atom, &var_cache))
+                })
         });
         for op in body_restrictions {
             solver.assert(op);
