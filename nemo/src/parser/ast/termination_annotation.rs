@@ -1,13 +1,17 @@
 //! This module defines [InputAnnotation].
 #![allow(missing_docs)]
 
-use nom::sequence::{separated_pair, tuple};
+use enum_assoc::Assoc;
+use nom::{
+    branch::alt,
+    sequence::{separated_pair, tuple},
+};
 
 use crate::parser::{
     ParserResult,
     ast::{
-        expression::complex::{atom::Atom, infix::InfixExpression},
-        sequence::Sequence,
+        expression::complex::{arithmetic::Arithmetic, atom::Atom},
+        token::TokenKind,
     },
     context::{ParserContext, context},
     input::ParserInput,
@@ -16,38 +20,52 @@ use crate::parser::{
 
 use super::{ProgramAST, comment::wsoc::WSoC, token::Token};
 
+#[derive(Assoc, Debug, Clone, Copy, PartialEq, Eq)]
+#[func(pub fn token(token: TokenKind) -> Option<Self>)]
+pub enum TerminationDirection {
+    #[assoc(token = TokenKind::OpenDecrease)]
+    Decreasing,
+    #[assoc(token = TokenKind::OpenIncrease)]
+    Increasing,
+}
+
 /// An annotation that restricts variable ranges for rules
 #[derive(Debug)]
-pub struct InputAnnotation<'a> {
+pub struct TerminationAnnotation<'a> {
     /// [Span] associated with this node
     span: Span<'a>,
     /// Atom to be restricted
     predicate: Atom<'a>,
+    /// In which direction does the change happen
+    direction: TerminationDirection,
     /// [Sequence] containing variable body
-    body: Sequence<'a, InfixExpression<'a>>,
+    body: Arithmetic<'a>,
 }
 
-impl<'a> InputAnnotation<'a> {
+impl<'a> TerminationAnnotation<'a> {
     /// Return the body of the global annotation
-    pub fn body(&self) -> impl Iterator<Item = &InfixExpression<'a>> {
-        self.body.iter()
+    pub fn body(&self) -> &Arithmetic<'a> {
+        &self.body
     }
 
     /// Return the [Atom] that is annotated
     pub fn predicate(&self) -> &Atom<'a> {
         &self.predicate
     }
+
+    /// Returns the [TerminationDirection]
+    pub fn kind(&self) -> &TerminationDirection {
+        &self.direction
+    }
 }
 
 const CONTEXT: ParserContext = ParserContext::InputAnnotation;
 
-impl<'a> ProgramAST<'a> for InputAnnotation<'a> {
+impl<'a> ProgramAST<'a> for TerminationAnnotation<'a> {
     fn children(&self) -> Vec<&dyn ProgramAST<'a>> {
         let mut result = Vec::<&dyn ProgramAST>::new();
 
-        for expression in self.body() {
-            result.push(expression);
-        }
+        result.push(self.body());
 
         result
     }
@@ -64,19 +82,25 @@ impl<'a> ProgramAST<'a> for InputAnnotation<'a> {
         context(
             CONTEXT,
             separated_pair(
-                tuple((Token::open_input, WSoC::parse, Atom::parse)),
+                tuple((
+                    alt((Token::open_increase, Token::open_decrease)),
+                    WSoC::parse,
+                    Atom::parse,
+                )),
                 tuple((WSoC::parse, Token::annotation_seperator, WSoC::parse)),
-                Sequence::<InfixExpression>::parse,
+                Arithmetic::parse,
             ),
         )(input)
-        .map(|(rest, ((_, _, predicate), body))| {
+        .map(|(rest, ((token, _, predicate), body))| {
             let rest_span = rest.span;
-
+            let direction = TerminationDirection::token(token.kind())
+                .expect("unrecogniszed annotation direction");
             (
                 rest,
                 Self {
                     span: input_span.until_rest(&rest_span),
                     predicate,
+                    direction,
                     body,
                 },
             )
@@ -94,25 +118,25 @@ mod test {
 
     use crate::parser::{
         ParserState,
-        ast::{ProgramAST, input_annotation::InputAnnotation},
+        ast::{ProgramAST, termination_annotation::TerminationAnnotation},
         input::ParserInput,
     };
 
     #[test]
     fn parse_annotation() {
         let test = vec![
-            ("#input test(?X,?Y): ?X<3", ("test".to_string())),
-            ("#input bla(?X):  0<?X, ?X<10", ("bla".to_string())),
+            ("#decreases test(?X,?Y): ?X + ?Y", ("test".to_string())),
+            ("#increases bla(?Z):  ?Z+0", ("bla".to_string())),
         ];
 
         for (input, expected) in test {
             let parser_input = ParserInput::new(input, ParserState::default());
-            let result = all_consuming(InputAnnotation::parse)(parser_input);
+            let result = all_consuming(TerminationAnnotation::parse)(parser_input);
 
             assert!(result.is_ok());
 
             let result = result.unwrap();
-            println!("");
+
             assert_eq!(result.1.predicate.tag().to_string(), expected);
         }
     }

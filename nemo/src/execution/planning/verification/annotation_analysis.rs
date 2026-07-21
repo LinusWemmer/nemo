@@ -2,6 +2,9 @@
 
 use std::collections::HashSet;
 
+use graph_cycles::Cycles;
+use petgraph::Graph;
+
 use crate::{
     execution::{
         planning::{
@@ -13,10 +16,13 @@ use crate::{
                 annotation_analysis::{
                     propagation_graph::PropagationGraph, rule_selection::RuleAnalysisGraph,
                 },
+                edb_analysis::{self, EdbAnalyzer},
                 rule_verification::RuleVerifier,
             },
         },
-        selection_strategy::dependency_graph::graph_positive::GraphConstructorPositive,
+        selection_strategy::dependency_graph::{
+            graph_constructor::DependencyGraphConstructor, graph_positive::GraphConstructorPositive,
+        },
     },
     rule_model::components::tag::Tag,
 };
@@ -26,21 +32,24 @@ pub mod propagation_graph;
 pub mod rule_selection;
 
 /// Analyzes the given annotations
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AnnotationAnalyzer {
-    /// The program to be analized
+    /// The program to be analyzed
     program: NormalizedProgram,
-    // The Set of Restrictions on the predicate with respective arity
-    //unary_restrictions: HashMap<(Tag, usize), RangeRestriction>,
+
+    /// The rule graph of the program
+    rule_graph: RuleAnalysisGraph<GraphConstructorPositive>,
 }
 
 impl AnnotationAnalyzer {
     /// Create a new [AnnotationAnalyzer]
     pub fn new(program: &NormalizedProgram) -> Self {
         let program = program.clone();
+        let rule_graph =
+            RuleAnalysisGraph::<GraphConstructorPositive>::new(program.rules().iter().collect());
         Self {
             program,
-            //unary_restrictions: HashMap::default(),
+            rule_graph,
         }
     }
 
@@ -71,14 +80,12 @@ impl AnnotationAnalyzer {
             verifier.verify_facts(fact, self.program());
         }
 
-        let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
-            self.program.rules().iter().collect(),
-        );
+        self.rule_graph.reset_scc_count();
 
         let mut valid = true;
 
         // actually not really necessary
-        while let Some(scc) = rule_graph.next_scc() {
+        while let Some(scc) = self.rule_graph.next_scc() {
             for rule_index in &scc {
                 let rule = &self.program.rules()[*rule_index];
                 println!("Checking rule {rule_index}: {rule}");
@@ -136,12 +143,10 @@ impl AnnotationAnalyzer {
             verifier.verify_facts(fact, self.program());
         }
 
-        let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
-            self.program.rules().iter().collect(),
-        );
+        self.rule_graph.reset_scc_count();
 
         // Do a topological bottom up propagation & verification
-        while let Some(scc) = rule_graph.next_scc() {
+        while let Some(scc) = self.rule_graph.next_scc() {
             let mut delta = true;
             while delta {
                 delta = false;
@@ -171,23 +176,23 @@ impl AnnotationAnalyzer {
             verifier.verify_facts(fact, self.program());
         }
 
-        let mut rule_graph = RuleAnalysisGraph::<GraphConstructorPositive>::new(
-            self.program.rules().iter().collect(),
-        );
+        self.rule_graph.reset_scc_count();
 
-        let rules: Vec<&NormalizedRule> = self.program.rules().iter().collect();
-        let graph = PropagationGraph::build_graph(&rules);
-        graph.print_graph();
         // Do a topological bottom up propagation & verification
-        while let Some(scc) = rule_graph.next_scc() {
+        while let Some(scc) = self.rule_graph.next_scc() {
             if scc.len() == 1 {
                 let rule = &self.program.rules()[scc[0]];
                 if !rule.is_recursive() {
-                    verifier.verify_with_restrictions(self.program(), &rule);
-                    verifier.forward_propagation(self.program(), &rule);
+                    verifier.forward_propagation(self.program(), rule);
+                    verifier.verify_with_restrictions(self.program(), rule);
+                    continue;
                 }
-            } else {
             }
+
+            let prop_graph = PropagationGraph::build_graph(&scc, self.program.rules());
+            prop_graph.print_graph();
+            println!("weakly acyclic: {}", prop_graph.is_weakly_acyclic());
+
             let mut delta = true;
             while delta {
                 //TODO: put back delta maybe
@@ -200,6 +205,32 @@ impl AnnotationAnalyzer {
                     verifier.verify_with_restrictions(self.program(), &rule);
                 }
             }
+        }
+    }
+
+    /// Checks whether termination of the program can be verified
+    /// Move to own module
+    pub fn check_termination(&mut self) -> bool {
+        let edb_analyser = EdbAnalyzer::new(self.program(), self.rule_graph.clone());
+        self.rule_graph.reset_scc_count();
+        while let Some(scc) = self.rule_graph.next_scc() {
+            let propagation_graph = PropagationGraph::build_graph(&scc, self.program.rules());
+            if propagation_graph.is_weakly_acyclic() {
+                // scc acyclic
+            } else {
+            }
+        }
+
+        true
+    }
+
+    /// checks whether the subgraph has critical cycles
+    /// Move to own module
+    pub fn check_critical_cycles(&self, scc: Vec<usize>, propagation_graph: &PropagationGraph) {
+        let special_cycles = propagation_graph.special_cycles();
+        for cycle in special_cycles {
+            // get all other cycles starting with the same predicate with same rule word attached
+            // Check if at least one is bound (lower or upper or in general, depending on annotation)
         }
     }
 }

@@ -156,7 +156,7 @@ impl TransformationIncremental {
                 Statement::Parameter(_)
                 | Statement::Import(_)
                 | Statement::GlobalAnnotation(_)
-                | Statement::InputAnnotation(_)
+                | Statement::TerminationAnnotation(_)
                 | Statement::TypeAnnotation(_) => {}
             }
         }

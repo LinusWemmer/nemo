@@ -4,8 +4,6 @@ use std::collections::HashSet;
 
 use nemo_physical::datavalues::ValueDomain;
 
-use crate::rule_model::components::tag::Tag;
-
 #[derive(Debug, Clone)]
 pub struct RelationTypes {
     /// arity of the predicate

@@ -13,7 +13,7 @@ use crate::{
         normalization::{
             atom::ground::GroundAtom, export::ExportInstruction,
             global_annotation::NormalizedGlobalAnnotation, import::ImportInstruction,
-            input_annotation::NormalizedInputAnnotation, rule::NormalizedRule,
+            rule::NormalizedRule, termination_annotation::NormalizedTerminationAnnotation,
             type_annotation::NormalizedTypeAnnotation,
         },
     },
@@ -39,7 +39,7 @@ pub struct NormalizedProgram {
     /// Global Annotations
     global_annotations: Vec<NormalizedGlobalAnnotation>,
     /// Input Annotations
-    input_annotations: Vec<NormalizedInputAnnotation>,
+    termination_annotations: Vec<NormalizedTerminationAnnotation>,
     /// Type Annotations
     type_annotations: Vec<NormalizedTypeAnnotation>,
 
@@ -140,8 +140,8 @@ impl NormalizedProgram {
     }
 
     /// Return a list of the input annotations of this program
-    pub fn input_annotations(&self) -> &Vec<NormalizedInputAnnotation> {
-        &self.input_annotations
+    pub fn termination_annotations(&self) -> &Vec<NormalizedTerminationAnnotation> {
+        &self.termination_annotations
     }
 
     /// Return all global annotations for the given predicate
@@ -169,8 +169,8 @@ impl NormalizedProgram {
     }
 
     /// Add an input annotation to the normalized program
-    pub fn add_input_annotation(&mut self, annotation: NormalizedInputAnnotation) {
-        self.input_annotations.push(annotation)
+    pub fn add_termination_annotation(&mut self, annotation: NormalizedTerminationAnnotation) {
+        self.termination_annotations.push(annotation)
     }
 
     /// Add a type annotation to the normalized program
@@ -322,10 +322,10 @@ impl NormalizedProgram {
         }
 
         // Handle input annotations
-        for annotation in program.input_annotations() {
+        for annotation in program.termination_annotations() {
             let normalized_annotation =
-                NormalizedInputAnnotation::normalize_input_annotation(annotation);
-            result.add_input_annotation(normalized_annotation);
+                NormalizedTerminationAnnotation::normalize_termination_annotation(annotation);
+            result.add_termination_annotation(normalized_annotation);
         }
 
         // Handle type annotations

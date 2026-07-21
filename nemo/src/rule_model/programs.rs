@@ -4,7 +4,8 @@ use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use crate::rule_model::{
     components::{
-        input_annotation::InputAnnotation, statement::Statement, type_annotation::TypeAnnotation,
+        statement::Statement, termination_annotation::TerminationAnnotation,
+        type_annotation::TypeAnnotation,
     },
     error::info::Info,
 };
@@ -63,8 +64,8 @@ pub trait ProgramWrite {
         self.add_statement(global_annotation.into());
     }
     /// Add a new input annotation to this program.
-    fn add_input_annotation(&mut self, input_annotation: InputAnnotation) {
-        self.add_statement(input_annotation.into());
+    fn add_termination_annotation(&mut self, termination_annotation: TerminationAnnotation) {
+        self.add_statement(termination_annotation.into());
     }
     /// Add a new type annotation to this program
     fn add_type_annotation(&mut self, type_annotation: TypeAnnotation) {

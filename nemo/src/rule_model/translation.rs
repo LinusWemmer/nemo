@@ -6,10 +6,10 @@ pub(crate) mod complex;
 pub(crate) mod directive;
 pub(crate) mod fact;
 pub(crate) mod global_annotation;
-pub(crate) mod input_annotation;
 pub(crate) mod literal;
 pub(crate) mod rule;
 mod term;
+pub(crate) mod termination_annotation;
 pub(crate) mod type_annotation;
 
 use std::{
@@ -30,7 +30,9 @@ use crate::{
         input::ParserInput,
     },
     rule_file::RuleFile,
-    rule_model::{components::input_annotation::InputAnnotation, programs::ProgramWrite},
+    rule_model::{
+        components::termination_annotation::TerminationAnnotation, programs::ProgramWrite,
+    },
     util::bag::Bag,
 };
 
@@ -118,11 +120,11 @@ impl ASTProgramTranslation {
                         program.add_global_annotation(global_annotation);
                     }
                 }
-                ast::statement::StatementKind::InputAnnotation(input_annotation) => {
-                    if let Some(input_annotation) =
-                        InputAnnotation::build_component(&mut self, input_annotation)
+                ast::statement::StatementKind::TerminationAnnotation(termination_annotation) => {
+                    if let Some(termination_annotation) =
+                        TerminationAnnotation::build_component(&mut self, termination_annotation)
                     {
-                        program.add_input_annotation(input_annotation);
+                        program.add_termination_annotation(termination_annotation);
                     }
                 }
                 ast::statement::StatementKind::TypeAnnotation(type_annotation) => {

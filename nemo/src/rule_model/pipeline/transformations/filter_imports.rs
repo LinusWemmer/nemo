@@ -97,7 +97,7 @@ impl TransformationFilterImports {
                 Statement::Import(_) => {}
                 Statement::Parameter(_) => {}
                 Statement::GlobalAnnotation(_) => {}
-                Statement::InputAnnotation(_) => {}
+                Statement::TerminationAnnotation(_) => {}
                 Statement::TypeAnnotation(_) => {}
             }
         }

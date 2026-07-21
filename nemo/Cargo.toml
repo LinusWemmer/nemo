@@ -61,6 +61,7 @@ indexmap = "2.10.0"
 smtlib = { git = "https://github.com/oeb25/smtlib-rs", package = "smtlib" }
 z3 = "0.20.0"
 smtlib-lowlevel = "0.3.0"
+graph-cycles = { git = "https://github.com/a-maier/graph-cycles/", package = "graph-cycles" }
 
 [dev-dependencies]
 env_logger = "*"

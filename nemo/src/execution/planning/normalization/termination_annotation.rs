@@ -1,4 +1,4 @@
-//! This module defines [NormalizedInputAnnotation]
+//! This module defines [NormalizedTerminationAnnotation]
 
 use std::fmt::Display;
 
@@ -9,32 +9,47 @@ use crate::{
     rule_model::components::term::primitive::variable::Variable,
 };
 
-/// Represents a normalized Global Annotation
-#[derive(Debug, Clone)]
-pub struct NormalizedInputAnnotation {
-    ///Headatom of the annotation TODO: maybe make this a body atom?
-    head: BodyAtom,
-
-    /// Restrictions placed on the head atom, TODO
-    body: Vec<Operation>,
+/// Represents Direction of Termination
+#[derive(Debug, Copy, Clone)]
+pub enum TerminationDirection {
+    /// Decreasing
+    Decreasing,
+    /// Increasing
+    Increasing,
 }
 
-impl NormalizedInputAnnotation {
+/// Represents a normalized Global Annotation
+#[derive(Debug, Clone)]
+pub struct NormalizedTerminationAnnotation {
+    ///Headatom of the annotation TODO: maybe make this a body atom?
+    head: BodyAtom,
+    /// Direction in which the termination happesn
+    direction: TerminationDirection,
+    /// Restrictions placed on the head atom, TODO
+    body: Operation,
+}
+
+impl NormalizedTerminationAnnotation {
     /// Return the head of the annotation
     pub fn head(&self) -> &BodyAtom {
         &self.head
     }
 
     /// Return the list of body operations of the annotation
-    pub fn body(&self) -> &Vec<Operation> {
+    pub fn body(&self) -> &Operation {
         &self.body
+    }
+
+    /// Return the direction
+    pub fn direction(&self) -> TerminationDirection {
+        self.direction
     }
 }
 
-impl NormalizedInputAnnotation {
+impl NormalizedTerminationAnnotation {
     /// Normalizes the input annotation
-    pub fn normalize_input_annotation(
-        annotation: &crate::rule_model::components::input_annotation::InputAnnotation,
+    pub fn normalize_termination_annotation(
+        annotation: &crate::rule_model::components::termination_annotation::TerminationAnnotation,
     ) -> Self {
         let mut generator = VariableGenerator::default();
         let atom = annotation.predicate();
@@ -45,13 +60,18 @@ impl NormalizedInputAnnotation {
                 "Operations and Aggregations should not be used in annotation head, same variables in head not supported yet"
             );
         }
-        let body = annotation
-            .body()
-            .iter()
-            .map(Operation::normalize_body_operation)
-            .collect::<Vec<_>>();
+        let body = Operation::normalize_body_operation(annotation.body());
 
-        Self { head, body }
+        let direction = match annotation.direction(){
+            crate::rule_model::components::termination_annotation::TerminationDirection::Increasing => TerminationDirection::Increasing,
+            crate::rule_model::components::termination_annotation::TerminationDirection::Decreasing => TerminationDirection::Decreasing,
+        };
+
+        Self {
+            head,
+            direction,
+            body,
+        }
     }
 
     /// Returns all variables of the annotation as an iterator
@@ -60,20 +80,15 @@ impl NormalizedInputAnnotation {
     }
 }
 
-impl Display for NormalizedInputAnnotation {
+impl Display for NormalizedTerminationAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("#assert ")?;
         let pred = &self.head().to_string();
         write!(f, "{pred}")?;
         f.write_str(": ")?;
 
-        for (index, op) in self.body.iter().enumerate() {
-            write!(f, "{op}")?;
+        write!(f, "{}", self.body)?;
 
-            if index < self.body.len() - 1 {
-                f.write_str(", ")?;
-            }
-        }
         Ok(())
     }
 }

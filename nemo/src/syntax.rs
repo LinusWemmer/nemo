@@ -104,11 +104,13 @@ pub mod annotation_global {
     pub const ANNOTATION_SEPERATOR: &str = ":";
 }
 
-pub mod input_annotation {
-    //! This module contains syntax definitions for input annotations.
+pub mod termination_annotation {
+    //! This module contains syntax definitions for termination annotations.
 
-    /// opening token input:
-    pub const OPEN_INPUT: &str = "#input";
+    /// opening token increase:
+    pub const OPEN_INCREASE: &str = "#increases";
+    /// opening token dcrease:
+    pub const OPEN_DECREASE: &str = "#decreases";
 }
 
 pub mod type_annotation {

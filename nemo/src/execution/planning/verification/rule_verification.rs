@@ -5,7 +5,6 @@ use crate::execution::planning::{
     normalization::{
         atom::ground::GroundAtom,
         global_annotation::NormalizedGlobalAnnotation,
-        input_annotation::NormalizedInputAnnotation,
         {program::NormalizedProgram, rule::NormalizedRule},
     },
     verification::rule_verification::{
@@ -71,17 +70,14 @@ impl RuleVerifier {
     /// Add predicate restrictions from input annotation
     /// #Panics
     ///  * panics when there are two input annotations for the same predicate
-    pub fn add_restriction_from_input_annotation(
-        &mut self,
-        annotation: &NormalizedInputAnnotation,
-    ) {
+    /*pub fn add_restriction_from_input_annotation(&mut self, annotation: &NormalizedInputAnnotation) {
         if let Some(_) = self.predicate_restrictions.insert(
             annotation.head().predicate(),
             Restriction::new_from_annotation(annotation),
         ) {
             panic!("Only one input annotation should be used per predicate")
         }
-    }
+    }*/
 
     /// Add verification goal from output predicate
     pub fn add_output_verification_goal(&mut self, annotation: &NormalizedGlobalAnnotation) {

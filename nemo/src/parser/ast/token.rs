@@ -31,7 +31,7 @@ use crate::{
         datavalues::{self, RDF_DATATYPE_INDICATOR, boolean, iri, map, string, tuple},
         directive, encoding_prefixes,
         expression::{aggregate, atom, format_string, operation, variable},
-        input_annotation, operator, rule, type_annotation,
+        operator, rule, termination_annotation, type_annotation,
     },
 };
 
@@ -299,9 +299,12 @@ pub enum TokenKind {
     /// Open assert annotation
     #[assoc(name = annotation_global::OPEN_ASSERT)]
     OpenAssert,
-    /// Open assert annotation
-    #[assoc(name = input_annotation::OPEN_INPUT)]
-    OpenInput,
+    /// Open increasing termination annotation
+    #[assoc(name = termination_annotation::OPEN_INCREASE)]
+    OpenIncrease,
+    /// Open decreasing termination annotation
+    #[assoc(name = termination_annotation::OPEN_DECREASE)]
+    OpenDecrease,
     /// Open type annotation
     #[assoc(name = type_annotation::OPEN_TYPE)]
     OpenType,
@@ -919,7 +922,8 @@ impl<'a> Token<'a> {
     string_token!(close_attribute, TokenKind::CloseAttribute);
     string_token!(open_type_annotation, TokenKind::OpenType);
     string_token!(open_assert, TokenKind::OpenAssert);
-    string_token!(open_input, TokenKind::OpenInput);
+    string_token!(open_increase, TokenKind::OpenIncrease);
+    string_token!(open_decrease, TokenKind::OpenDecrease);
     string_token!(annotation_seperator, TokenKind::AnnotationSeperator);
     string_token!(rule_arrow, TokenKind::RuleArrow);
     string_token!(universal_indicator, TokenKind::UniversalIndicator);

@@ -11,7 +11,6 @@ use crate::rule_model::{
         fact::Fact,
         global_annotation::GlobalAnnotation,
         import_export::{ExportDirective, ImportDirective},
-        input_annotation::InputAnnotation,
         output::Output,
         parameter::ParameterDeclaration,
         rule::Rule,
@@ -19,6 +18,7 @@ use crate::rule_model::{
             Term,
             primitive::{Primitive, variable::Variable},
         },
+        termination_annotation::TerminationAnnotation,
         type_annotation::TypeAnnotation,
     },
     error::ValidationReport,
@@ -43,9 +43,9 @@ pub enum Statement {
     Parameter(ParameterDeclaration),
     /// GlobalAnnotation
     GlobalAnnotation(GlobalAnnotation),
-    /// InputAnnotation
-    InputAnnotation(InputAnnotation),
-    /// InputAnnotation
+    /// TerminationAnnotation
+    TerminationAnnotation(TerminationAnnotation),
+    /// TerminationAnnotation
     TypeAnnotation(TypeAnnotation),
 }
 
@@ -81,7 +81,7 @@ impl Statement {
     }
     /// Check whether this statement is an annotation
     pub fn is_annotation(&self) -> bool {
-        matches!(self, Self::GlobalAnnotation(_)) || matches!(self, Self::InputAnnotation(_))
+        matches!(self, Self::GlobalAnnotation(_)) || matches!(self, Self::TerminationAnnotation(_))
     }
 }
 
@@ -95,7 +95,7 @@ impl Display for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
-            Self::InputAnnotation(statement) => statement,
+            Self::TerminationAnnotation(statement) => statement,
             Self::TypeAnnotation(statement) => statement,
         } {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
@@ -113,7 +113,7 @@ impl ComponentBehavior for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
-            Self::InputAnnotation(statement) =>statement,
+            Self::TerminationAnnotation(statement) =>statement,
             Self::TypeAnnotation(statement) => statement,
         } {
             fn kind(&self) -> ProgramComponentKind;
@@ -135,7 +135,7 @@ impl ComponentSource for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
-            Self::InputAnnotation(statement) => statement,
+            Self::TerminationAnnotation(statement) => statement,
             Self::TypeAnnotation(statement) => statement,
         } {
             fn origin(&self) -> Origin;
@@ -154,7 +154,7 @@ impl ComponentIdentity for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
-            Self::InputAnnotation(statement) => statement,
+            Self::TerminationAnnotation(statement) => statement,
             Self::TypeAnnotation(statement) => statement,
         } {
             fn id(&self) -> ProgramComponentId;
@@ -173,7 +173,7 @@ impl IterableComponent for Statement {
             Self::Output(statement) => statement,
             Self::Parameter(statement) => statement,
             Self::GlobalAnnotation(statement) => statement,
-            Self::InputAnnotation(statement) => statement,
+            Self::TerminationAnnotation(statement) => statement,
             Self::TypeAnnotation(statement) => statement,
         } {
             #[allow(late_bound_lifetime_arguments)]
@@ -196,7 +196,7 @@ impl IterableVariables for Statement {
             Self::Output(statement) => statement.variables(),
             Self::Parameter(statement) => statement.variables(),
             Self::GlobalAnnotation(statement) => statement.variables(),
-            Self::InputAnnotation(statement) => statement.variables(),
+            Self::TerminationAnnotation(statement) => statement.variables(),
             Self::TypeAnnotation(statement) => statement.variables(),
         }
     }
@@ -210,7 +210,7 @@ impl IterableVariables for Statement {
             Self::Output(statement) => statement.variables_mut(),
             Self::Parameter(statement) => statement.variables_mut(),
             Self::GlobalAnnotation(statement) => statement.variables_mut(),
-            Self::InputAnnotation(statement) => statement.variables_mut(),
+            Self::TerminationAnnotation(statement) => statement.variables_mut(),
             Self::TypeAnnotation(statement) => statement.variables_mut(),
         }
     }
@@ -226,7 +226,7 @@ impl IterablePrimitives for Statement {
             Self::Output(statement) => statement.primitive_terms(),
             Self::Parameter(statement) => statement.primitive_terms(),
             Self::GlobalAnnotation(statement) => statement.primitive_terms(),
-            Self::InputAnnotation(statement) => statement.primitive_terms(),
+            Self::TerminationAnnotation(statement) => statement.primitive_terms(),
             Self::TypeAnnotation(statement) => statement.primitive_terms(),
         }
     }
@@ -240,7 +240,7 @@ impl IterablePrimitives for Statement {
             Self::Output(statement) => statement.primitive_terms_mut(),
             Self::Parameter(statement) => statement.primitive_terms_mut(),
             Self::GlobalAnnotation(statement) => statement.primitive_terms_mut(),
-            Self::InputAnnotation(statement) => statement.primitive_terms_mut(),
+            Self::TerminationAnnotation(statement) => statement.primitive_terms_mut(),
             Self::TypeAnnotation(statement) => statement.primitive_terms_mut(),
         }
     }
@@ -264,9 +264,9 @@ impl From<GlobalAnnotation> for Statement {
     }
 }
 
-impl From<InputAnnotation> for Statement {
-    fn from(value: InputAnnotation) -> Self {
-        Self::InputAnnotation(value)
+impl From<TerminationAnnotation> for Statement {
+    fn from(value: TerminationAnnotation) -> Self {
+        Self::TerminationAnnotation(value)
     }
 }
 

@@ -2,6 +2,7 @@
 
 pub mod annotation_analysis;
 //pub mod restriction;
+pub mod edb_analysis;
 pub mod rule_verification;
 //pub mod smt_builder;
 //pub mod type_verification;

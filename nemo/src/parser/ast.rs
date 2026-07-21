@@ -6,12 +6,12 @@ pub mod directive;
 pub mod expression;
 pub mod global_annotation;
 pub mod guard;
-pub mod input_annotation;
 pub mod program;
 pub mod rule;
 pub mod sequence;
 pub mod statement;
 pub mod tag;
+pub mod termination_annotation;
 pub mod token;
 pub mod type_annotation;
 

@@ -7,7 +7,7 @@ use crate::execution::{
 };
 
 /// Defines Selection for rule propagation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RuleAnalysisGraph<GraphConstructor: DependencyGraphConstructor> {
     _constructor: PhantomData<GraphConstructor>,
 
@@ -46,5 +46,10 @@ impl<GraphConstructor: DependencyGraphConstructor> RuleAnalysisGraph<GraphConstr
             return Some(self.ordered_sccs[index].clone());
         }
         None
+    }
+
+    /// Resets the counter to reuse the graph
+    pub fn reset_scc_count(&mut self) {
+        self.current_scc_index = 0;
     }
 }

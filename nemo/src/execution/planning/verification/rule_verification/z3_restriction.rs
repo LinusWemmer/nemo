@@ -9,10 +9,7 @@ use z3::{
 
 use crate::{
     execution::planning::{
-        normalization::{
-            atom::{body::BodyAtom, head::HeadAtom},
-            input_annotation::NormalizedInputAnnotation,
-        },
+        normalization::atom::{body::BodyAtom, head::HeadAtom},
         verification::rule_verification::z3_translation::RuleTranslator,
     },
     rule_model::components::term::primitive::{
@@ -21,18 +18,19 @@ use crate::{
     },
 };
 
-/// Represents a restriction using z3 predicates very WIP
+/// Represents a restriction using z3 predicates very
+/// TODO: restriction are only allowed to be > or similar operations (syntactic check)
 #[derive(Debug, Clone)]
 pub struct Restriction {
     /// Variable names in restriction
     restriction_head_vars: Vec<Int>,
     /// Theory for bounds on the head
-    restrictions: Bool,
+    restrictions: Vec<Bool>,
 }
 
 impl Restriction {
     /// Creates a new set of restricitons from Input
-    pub fn new_from_annotation(annotation: &NormalizedInputAnnotation) -> Self {
+    /*pub fn new_from_annotation(annotation: &NormalizedInputAnnotation) -> Self {
         let head_vars: Vec<Int> = (0..annotation.head().arity())
             .map(|n| Int::fresh_const(&format!("V{n}")))
             .collect();
@@ -59,9 +57,9 @@ impl Restriction {
 
         Self {
             restriction_head_vars: head_vars,
-            restrictions: restriction,
+            restrictions: vec![restriction],
         }
-    }
+    }*/
 
     /// Creates a new [Restriction] from a propagated formula
     pub fn new_from_propagation(
@@ -82,10 +80,10 @@ impl Restriction {
             })
             .collect();
 
-        let restrictions = prop_restriction.substitute(&substitution);
+        let restriction = prop_restriction.substitute(&substitution);
         Self {
             restriction_head_vars: head_vars,
-            restrictions,
+            restrictions: vec![restriction],
         }
     }
 
@@ -106,23 +104,41 @@ impl Restriction {
                 )
             })
             .collect();
-        self.restrictions.substitute(&substitution)
+        let body_res: Vec<Bool> = self
+            .restrictions
+            .iter()
+            .map(|res| res.substitute(&substitution))
+            .collect();
+
+        Bool::and(&body_res)
     }
 
     /// Checks whether a new restriction actually gives new entailments
     pub fn check_new_entailment(&self, new_restriction: &Bool) -> bool {
         let solver = Solver::new();
 
-        solver.assert(self.restrictions.not());
+        solver.assert(Bool::and(&self.restrictions).not());
         solver.assert(new_restriction);
-
-        //println!("{}", solver.to_smt2());
 
         match solver.check() {
             z3::SatResult::Unsat => false,
             z3::SatResult::Unknown => false,
             z3::SatResult::Sat => true,
         }
+    }
+
+    // Checks whether the given operation is actually a valid restriction (i.e. some form of y<c or x<y or similar)
+    pub fn is_valid_operation(restriction: &Bool) -> bool {
+        let children = restriction.children();
+        let left = children.first();
+        let right = children.get(1);
+        if restriction.is_app()
+            && let Some(t1) = left
+            && let Some(t2) = right
+        {
+            return (t1.is_const() || t1.is_app()) && (t2.is_const() || t2.is_app());
+        }
+        false
     }
 
     /// Adds a restriction to the set of restrictions, returns true if something changes, false otherwise
@@ -148,8 +164,7 @@ impl Restriction {
         if !self.check_new_entailment(&new_restrictions) {
             return false;
         }
-        //TODO: maybe don't simplify?
-        goal.assert(&Bool::or(&[&self.restrictions, &new_restrictions]));
+        goal.assert(&new_restrictions);
 
         let result = tactic_simplify
             .apply(&goal, None)
@@ -158,7 +173,7 @@ impl Restriction {
             .collect::<Vec<Goal>>();
 
         if let Some(goal) = result.first() {
-            self.restrictions = Bool::and(&goal.get_formulas());
+            self.restrictions.push(Bool::and(&goal.get_formulas()));
             //println!("simplified formulas:{:#?}", goal.get_formulas())
         }
         true
@@ -167,6 +182,9 @@ impl Restriction {
 
 impl Display for Restriction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.restrictions)
+        for restriction in self.restrictions.clone() {
+            write!(f, "{}, ", restriction);
+        }
+        Ok(())
     }
 }

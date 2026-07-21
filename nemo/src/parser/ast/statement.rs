@@ -9,7 +9,6 @@ use nom::{
 
 use crate::parser::{
     ParserResult,
-    ast::input_annotation::InputAnnotation,
     context::{ParserContext, context},
     input::ParserInput,
     span::Span,
@@ -23,6 +22,7 @@ use super::{
     global_annotation::GlobalAnnotation,
     guard::Guard,
     rule::Rule,
+    termination_annotation::TerminationAnnotation,
     token::Token,
     type_annotation::TypeAnnotation,
 };
@@ -41,8 +41,8 @@ pub enum StatementKind<'a> {
     Error(Token<'a>),
     /// Global Annotation
     GlobalAnnotation(GlobalAnnotation<'a>),
-    /// Global Annotation
-    InputAnnotation(InputAnnotation<'a>),
+    /// Termination Annotation
+    TerminationAnnotation(TerminationAnnotation<'a>),
     /// Type Annotation
     TypeAnnotation(TypeAnnotation<'a>),
 }
@@ -55,7 +55,7 @@ impl<'a> StatementKind<'a> {
             StatementKind::Rule(statement) => statement.context(),
             StatementKind::Directive(statement) => statement.context(),
             StatementKind::GlobalAnnotation(statement) => statement.context(),
-            StatementKind::InputAnnotation(statement) => statement.context(),
+            StatementKind::TerminationAnnotation(statement) => statement.context(),
             StatementKind::TypeAnnotation(statement) => statement.context(),
             StatementKind::Error(_statement) => ParserContext::Error,
         }
@@ -70,7 +70,7 @@ impl<'a> StatementKind<'a> {
                 map(Rule::parse, Self::Rule),
                 map(Guard::parse, Self::Fact),
                 map(GlobalAnnotation::parse, Self::GlobalAnnotation),
-                map(InputAnnotation::parse, Self::InputAnnotation),
+                map(TerminationAnnotation::parse, Self::TerminationAnnotation),
             )),
         )(input)
     }
@@ -117,7 +117,7 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
             StatementKind::Rule(statement) => vec![statement],
             StatementKind::Directive(statement) => vec![statement],
             StatementKind::GlobalAnnotation(statement) => vec![statement],
-            StatementKind::InputAnnotation(statement) => vec![statement],
+            StatementKind::TerminationAnnotation(statement) => vec![statement],
             StatementKind::TypeAnnotation(statement) => vec![statement],
             StatementKind::Error(_) => vec![],
         }

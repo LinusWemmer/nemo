@@ -7,7 +7,6 @@ pub mod atom;
 pub mod fact;
 pub mod global_annotation;
 pub mod import_export;
-pub mod input_annotation;
 pub mod literal;
 pub mod output;
 pub mod parameter;
@@ -16,6 +15,7 @@ pub mod statement;
 pub mod symbols;
 pub mod tag;
 pub mod term;
+pub mod termination_annotation;
 pub mod type_annotation;
 use std::{
     any::Any,
@@ -124,7 +124,7 @@ pub enum ProgramComponentKind {
     GlobalAnnotation,
     ///Input Annotation
     #[assoc(name = "input annotation")]
-    InputAnnotation,
+    TerminationAnnotation,
     ///Rule Annotation
     #[assoc(name = "rule annotation")]
     RuleAnnotation,
