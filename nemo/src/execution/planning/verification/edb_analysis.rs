@@ -1,6 +1,6 @@
 //! Defines [EdbAnalyzer]
 
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Display};
 
 use crate::{
     execution::{
@@ -21,12 +21,80 @@ use crate::{
     },
 };
 
+/// Tool to check which predicate positions contain only edb values
 #[derive(Debug, Clone)]
 pub struct EdbAnalyzer {
     edb_positions: HashSet<(Tag, usize)>,
 }
 
 impl EdbAnalyzer {
+    /// Propagate the ebd positions through the rule
+    /// returns true if something changed
+    pub fn propagate_positions(
+        edb_positions: &mut HashSet<(Tag, usize)>,
+        rejected_positions: &mut HashSet<(Tag, usize)>,
+        rule: &NormalizedRule,
+    ) -> bool {
+        let mut delta = false;
+        let head = &rule.head()[0];
+        let rejected_positions_clone = rejected_positions.clone();
+        for (head_pos, prim) in head
+            .terms()
+            .enumerate()
+            .filter(|(pos_h, _)| !rejected_positions_clone.contains(&(head.predicate(), *pos_h)))
+        {
+            match prim {
+                Primitive::Variable(var_h) => {
+                    /*or b in rule.positive() {
+                        for (body_pos, var_b) in b.terms().enumerate() {
+                            println!("{}", var_b == var_h);
+                            println!("b{}", edb_positions.contains(&(b.predicate(), body_pos)));
+                            if edb_positions.contains(&(b.predicate(), body_pos)) && var_b == var_h
+                            {
+                                delta = edb_positions.insert((head.predicate(), head_pos));
+                                println!("delta");
+                            } else if rejected_positions.contains(&(b.predicate(), body_pos)) {
+                                delta = rejected_positions.insert((head.predicate(), head_pos));
+                            }
+                        }
+                    }*/
+                    // Var occurs in body position of edb_position
+                    if rule.positive().iter().any(|b| {
+                        b.terms().enumerate().any(|(body_pos, var_b)| {
+                            (var_b == var_h) && edb_positions.contains(&(b.predicate(), body_pos))
+                        })
+                    }) {
+                        println!("foo");
+                        delta = edb_positions.insert((head.predicate(), head_pos)) || delta;
+                    }
+                    // Var occurs in body position of rejected_position
+                    else if rule.positive().iter().any(|b| {
+                        b.terms().enumerate().any(|(body_pos, var_b)| {
+                            (var_b == var_h)
+                                && rejected_positions.contains(&(b.predicate(), body_pos))
+                        })
+                    }) {
+                        println!("foof");
+                        delta = rejected_positions.insert((head.predicate(), head_pos)) || delta;
+                    }
+                    // Variable occurs in critical operation
+                    else if rule.operations().iter().any(|op| {
+                        op.variables()
+                            .any(|v_op| (v_op == var_h) && EdbAnalyzer::critical_operation(&op))
+                    }) {
+                        delta = rejected_positions.insert((head.predicate(), head_pos)) || delta;
+                    }
+                }
+
+                Primitive::Ground(_) => {
+                    edb_positions.insert((head.predicate(), head_pos));
+                }
+            }
+        }
+        delta
+    }
+
+    /// Creates a new [EdbAnalyzer]
     pub fn new(
         program: &NormalizedProgram,
         mut rule_graph: RuleAnalysisGraph<GraphConstructorPositive>,
@@ -36,76 +104,39 @@ impl EdbAnalyzer {
         let mut rejected_positions: HashSet<(Tag, usize)> = HashSet::new();
         let derived_predicates = program.derived_predicates();
 
-        let edb_predicates = program.predicates().filter_map(|(tag, pos)| {
+        let edb_predicates = program.predicates().filter_map(|(tag, arity)| {
             if derived_predicates.contains(&tag) {
                 None
             } else {
-                Some((tag, pos))
+                Some((tag, arity))
             }
         });
 
-        edb_positions.extend(edb_predicates);
-        let mut delta;
-
-        while let Some(scc) = rule_graph.next_scc() {
-            delta = false;
-            while delta {
-                for rule_index in &scc {
-                    let rule = &program.rules()[*rule_index];
-                    let head = &rule.head()[0];
-                    let rejected_positions_clone = rejected_positions.clone();
-                    for (head_pos, prim) in head.terms().enumerate().filter(|(pos_h, _)| {
-                        !rejected_positions_clone.contains(&(head.predicate(), *pos_h))
-                    }) {
-                        match prim {
-                            Primitive::Variable(var_h) => {
-                                if rule.positive().iter().any(|b| {
-                                    b.terms().enumerate().any(|(body_pos, var_b)| {
-                                        (var_b == var_h)
-                                            && edb_positions.contains(&(b.predicate(), body_pos))
-                                    })
-                                }) {
-                                    delta =
-                                        edb_positions.insert((head.predicate(), head_pos)) || delta;
-                                } else {
-                                    if rule.operations().iter().any(|op| {
-                                        if op.variables().any(|v_op| v_op == var_h) {
-                                            return EdbAnalyzer::critical_operation(&op);
-                                        }
-                                        false
-                                    }) {
-                                        delta = rejected_positions
-                                            .insert((head.predicate(), head_pos))
-                                            || delta;
-                                    }
-                                }
-                            }
-                            Primitive::Ground(_) => {
-                                edb_positions.insert((head.predicate(), head_pos));
-                            }
-                        }
-                    }
-                }
+        for (tag, arity) in edb_predicates {
+            for i in 0..arity {
+                edb_positions.insert((tag.clone(), i));
             }
         }
 
-        Self { edb_positions }
-    }
+        let mut delta = true;
 
-    /// Checks whether the given positions is bound with respect to a scc
-    /// Bound if:
-    /// *edb-position
-    /// *A operation where all other variables contained are edb-annotations or bound
-    /// *TODO: lower stratum
-    /// *Bound by some annotation
-    pub fn is_bound(
-        &self,
-        variable: &Variable,
-        rule: &NormalizedRule,
-        program: &NormalizedProgram,
-    ) -> bool {
-        //rule.positive().iter().flat_map(|b| b.is)
-        todo!()
+        while let Some(scc) = rule_graph.next_scc() {
+            while delta {
+                delta = false;
+                for rule_index in &scc {
+                    let rule = &program.rules()[*rule_index];
+                    println!("prop {rule}");
+                    delta = EdbAnalyzer::propagate_positions(
+                        &mut edb_positions,
+                        &mut rejected_positions,
+                        rule,
+                    );
+                }
+            }
+        }
+        println!("edb: {:#?}", edb_positions);
+        println!("rejected: {:#?}", rejected_positions);
+        Self { edb_positions }
     }
 
     /// Returns true if the operation creates a new value for the variable
@@ -125,5 +156,31 @@ impl EdbAnalyzer {
         } else {
             false
         }
+    }
+
+    /// Checks whether the given positions is bound with respect to a scc
+    /// Bound if:
+    /// *edb-position
+    /// *A operation where all other variables contained are edb-annotations or bound
+    /// *TODO: lower stratum
+    /// *Bound by some annotation
+    pub fn is_bound(
+        &self,
+        variable: &Variable,
+        rule: &NormalizedRule,
+        program: &NormalizedProgram,
+    ) -> bool {
+        //rule.positive().iter().flat_map(|b| b.is)
+        todo!()
+    }
+}
+
+impl Display for EdbAnalyzer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("edb positions: ")?;
+        for (predicate, pos) in &self.edb_positions {
+            write!(f, "({predicate}, {pos}), ")?;
+        }
+        Ok(())
     }
 }
