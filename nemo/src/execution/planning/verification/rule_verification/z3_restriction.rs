@@ -3,15 +3,12 @@
 use std::{collections::HashMap, fmt::Display};
 
 use z3::{
-    Goal, Solver, Tactic,
+    Goal, Optimize, Solver, Tactic,
     ast::{Ast, Bool, Int},
 };
 
 use crate::{
-    execution::planning::{
-        normalization::atom::{body::BodyAtom, head::HeadAtom},
-        verification::rule_verification::z3_translation::RuleTranslator,
-    },
+    execution::planning::normalization::atom::{body::BodyAtom, head::HeadAtom},
     rule_model::components::term::primitive::{
         Primitive::{self, Ground},
         variable::Variable,
@@ -127,7 +124,7 @@ impl Restriction {
         }
     }
 
-    // Checks whether the given operation is actually a valid restriction (i.e. some form of y<c or x<y or similar)
+    /// Checks whether the given operation is actually a valid restriction (i.e. some form of y<c or x<y or similar)
     pub fn is_valid_operation(restriction: &Bool) -> bool {
         let children = restriction.children();
         let left = children.first();
@@ -178,12 +175,44 @@ impl Restriction {
         }
         true
     }
+
+    /// Returns true if the variable position has a lower bound from the given restrictions can be definietly found
+    pub fn has_lower_bound(&self, pos: usize) -> bool {
+        let pos_var = &self.restriction_head_vars[pos];
+
+        let optimize = Optimize::new();
+
+        optimize.assert(&Bool::or(&self.restrictions));
+        optimize.minimize(pos_var);
+        optimize.check(&[]); //TODO: might be necesarry to check what kind in order to avoid panic
+
+        match optimize.get_lower(0) {
+            Some(a) => !a.to_string().contains("oo"),
+            None => false,
+        }
+    }
+
+    /// Returns true if the variable position has an upper bound from the given restrictions can be definietly found
+    pub fn has_upper_bound(&self, pos: usize) -> bool {
+        let pos_var = &self.restriction_head_vars[pos];
+
+        let optimize = Optimize::new();
+
+        optimize.assert(&Bool::or(&self.restrictions));
+        optimize.maximize(pos_var);
+        optimize.check(&[]); //TODO: might be necesarry to check what kind in order to avoid panic
+
+        match optimize.get_upper(0) {
+            Some(a) => !a.to_string().contains("oo"),
+            None => false,
+        }
+    }
 }
 
 impl Display for Restriction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for restriction in self.restrictions.clone() {
-            write!(f, "{}, ", restriction);
+            write!(f, "{}, ", restriction)?;
         }
         Ok(())
     }
