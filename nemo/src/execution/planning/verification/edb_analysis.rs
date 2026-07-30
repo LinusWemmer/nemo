@@ -15,8 +15,8 @@ use crate::{
     rule_model::components::{
         tag::Tag,
         term::{
-            operation::operation_kind::OperationKind, primitive::Primitive,
-            primitive::variable::Variable,
+            operation::operation_kind::OperationKind,
+            primitive::{Primitive, variable::Variable},
         },
     },
 };
@@ -64,7 +64,6 @@ impl EdbAnalyzer {
                             (var_b == var_h) && edb_positions.contains(&(b.predicate(), body_pos))
                         })
                     }) {
-                        println!("foo");
                         delta = edb_positions.insert((head.predicate(), head_pos)) || delta;
                     }
                     // Var occurs in body position of rejected_position
@@ -74,7 +73,6 @@ impl EdbAnalyzer {
                                 && rejected_positions.contains(&(b.predicate(), body_pos))
                         })
                     }) {
-                        println!("foof");
                         delta = rejected_positions.insert((head.predicate(), head_pos)) || delta;
                     }
                     // Variable occurs in critical operation
@@ -125,7 +123,7 @@ impl EdbAnalyzer {
                 delta = false;
                 for rule_index in &scc {
                     let rule = &program.rules()[*rule_index];
-                    println!("prop {rule}");
+
                     delta = EdbAnalyzer::propagate_positions(
                         &mut edb_positions,
                         &mut rejected_positions,
@@ -134,8 +132,7 @@ impl EdbAnalyzer {
                 }
             }
         }
-        println!("edb: {:#?}", edb_positions);
-        println!("rejected: {:#?}", rejected_positions);
+        //println!("edb Positions: {:?}", edb_positions);
         Self { edb_positions }
     }
 
@@ -158,20 +155,54 @@ impl EdbAnalyzer {
         }
     }
 
-    /// Checks whether the given positions is bound with respect to a scc
+    /// Checks whether the given positions is bound with respect to edb predicates
     /// Bound if:
     /// *edb-position
     /// *A operation where all other variables contained are edb-annotations or bound
     /// *TODO: lower stratum
     /// *Bound by some annotation
-    pub fn is_bound(
+    /// TODO: check whether the negations are all correct
+    pub fn is_bound_by_edb(&self, variable: &Variable, rule: &NormalizedRule) -> bool {
+        let edb_variables_in_rule = self.edb_vars_in_rule(rule);
+        // Is directly an edb variable
+        edb_variables_in_rule.contains(variable)
+            || rule
+                .operations()
+                .iter()
+                .any(|op| self.bound_operation(variable, &edb_variables_in_rule, op))
+    }
+
+    pub fn edb_vars_in_rule(&self, rule: &NormalizedRule) -> HashSet<Variable> {
+        rule.positive()
+            .iter()
+            .flat_map(|b| {
+                b.terms().enumerate().filter_map(|(body_pos, body_var)| {
+                    if self.edb_positions.contains(&(b.predicate(), body_pos)) {
+                        Some(body_var)
+                    } else {
+                        None
+                    }
+                })
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Returns true if the variable is bound as an ebd, i.e. contains only one non-edb variable (namely var)
+    pub fn bound_operation(
         &self,
-        variable: &Variable,
-        rule: &NormalizedRule,
-        program: &NormalizedProgram,
+        var: &Variable,
+        edb_vars: &HashSet<Variable>,
+        op: &Operation,
     ) -> bool {
-        //rule.positive().iter().flat_map(|b| b.is)
-        todo!()
+        if let Operation::Opreation { kind, subterms: _ } = op
+            && matches!(kind, OperationKind::Equal)
+        {
+            !op.variables()
+                .any(|op_var| !(edb_vars.contains(op_var) || op_var == var))
+        } else {
+            true
+        }
     }
 }
 
