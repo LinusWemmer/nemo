@@ -210,7 +210,10 @@ mod test {
                 "#assert test(?X,?Y): ?X<3.",
                 ParserContext::GlobalAnnotation,
             ),
-            ("#input test(?X,?Y): ?X<3.", ParserContext::InputAnnotation),
+            (
+                "#input test(?X,?Y): ?X<3.",
+                ParserContext::TerminationAnnotation,
+            ),
         ];
 
         for (input, expect) in test {

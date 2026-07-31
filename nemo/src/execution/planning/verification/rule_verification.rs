@@ -3,9 +3,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::execution::planning::{
     normalization::{
-        atom::ground::GroundAtom,
-        global_annotation::NormalizedGlobalAnnotation,
-        {program::NormalizedProgram, rule::NormalizedRule},
+        atom::ground::GroundAtom, global_annotation::NormalizedGlobalAnnotation,
+        program::NormalizedProgram, rule::NormalizedRule,
     },
     verification::rule_verification::{
         z3_goal::VerificationGoal, z3_restriction::Restriction, z3_translation::RuleTranslator,
@@ -53,6 +52,11 @@ impl RuleVerifier {
     /// Returns the verification goals
     pub fn verification_goals(&self) -> &HashMap<Tag, VerificationGoal> {
         &self.verification_goals
+    }
+
+    /// Returns the predicate restrictions
+    pub fn predicate_restriction(&self) -> &HashMap<Tag, Restriction> {
+        &self.predicate_restrictions
     }
 
     /// Creates a map from nemo vars to z3 vars for the rule

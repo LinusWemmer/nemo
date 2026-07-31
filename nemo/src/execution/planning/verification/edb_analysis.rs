@@ -172,6 +172,7 @@ impl EdbAnalyzer {
                 .any(|op| self.bound_operation(variable, &edb_variables_in_rule, op))
     }
 
+    /// Returns all variables that contain values directly from the edb in them
     pub fn edb_vars_in_rule(&self, rule: &NormalizedRule) -> HashSet<Variable> {
         rule.positive()
             .iter()
@@ -188,7 +189,15 @@ impl EdbAnalyzer {
             .collect()
     }
 
-    /// Returns true if the variable is bound as an ebd, i.e. contains only one non-edb variable (namely var)
+    /// Returns the set of all bound variables in rule
+    pub fn bound_vars_in_rule(&self, rule: &NormalizedRule) -> HashSet<Variable> {
+        rule.variables()
+            .filter(|v| self.is_bound_by_edb(*v, rule))
+            .cloned()
+            .collect()
+    }
+
+    /// Returns true if the variable is bound as an ebd, i.e. contains only the variable itself as a non-edb var
     pub fn bound_operation(
         &self,
         var: &Variable,

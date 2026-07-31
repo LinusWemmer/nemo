@@ -59,7 +59,7 @@ impl<'a> TerminationAnnotation<'a> {
     }
 }
 
-const CONTEXT: ParserContext = ParserContext::InputAnnotation;
+const CONTEXT: ParserContext = ParserContext::TerminationAnnotation;
 
 impl<'a> ProgramAST<'a> for TerminationAnnotation<'a> {
     fn children(&self) -> Vec<&dyn ProgramAST<'a>> {

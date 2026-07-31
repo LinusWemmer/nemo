@@ -15,6 +15,7 @@ use crate::{
         operation::Operation,
         program::NormalizedProgram,
         rule::NormalizedRule,
+        termination_annotation::NormalizedTerminationAnnotation,
     },
     rule_model::components::{
         tag::Tag,
@@ -183,8 +184,62 @@ impl RuleTranslator {
         }
     }
 
-    /// Translates the global assertion body
-    /// TODO: add predicate
+    /// Translates the termination annotation statement for the given body atom
+    pub fn translate_termination_annotation_body(
+        &self,
+        annotation: &NormalizedTerminationAnnotation,
+        body_predicate: &BodyAtom,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Int {
+        let annotation_head: &BodyAtom = annotation.head();
+        let substitution = annotation_head.terms().zip(body_predicate.terms());
+
+        let var_sub: HashMap<Variable, Int> = substitution
+            .map(|(v_annotation, v_predicate)| {
+                (
+                    v_annotation.clone(),
+                    var_cache
+                        .get(v_predicate)
+                        .expect("Variable should be in cache")
+                        .clone(),
+                )
+            })
+            .collect();
+        self.translate_operation(annotation.body(), &var_sub)
+            .as_int()
+            .expect("termination annotation body should be an integer expression")
+    }
+
+    /// Translates the termination annotation statement for the given head atom
+    pub fn translate_termination_annotation_head(
+        &self,
+        annotation: &NormalizedTerminationAnnotation,
+        head_predicate: &HeadAtom,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Int {
+        let annotation_head: &BodyAtom = annotation.head();
+        let substitution = annotation_head.terms().zip(head_predicate.terms());
+
+        let prim_cache: HashMap<Variable, Int> = substitution
+            .map(|(v, p)| match p {
+                Primitive::Variable(head_var) => (
+                    v.clone(),
+                    var_cache
+                        .get(head_var)
+                        .expect("Variable should be in cache")
+                        .clone(),
+                ),
+                Primitive::Ground(ground_term) => (
+                    v.clone(),
+                    Int::from_i64(ground_term.value().to_i64_unchecked()),
+                ),
+            })
+            .collect();
+        self.translate_operation(annotation.body(), &prim_cache)
+            .as_int()
+            .expect("termination annotation body should be an integer expression")
+    }
+
     /// Maybe the varcache has to use a hashset as basis?
     pub fn translate_body_assertion(
         &self,
@@ -254,6 +309,22 @@ impl RuleTranslator {
         body_terms.extend(body_operations);
 
         body_terms
+    }
+
+    /// Translates a rule but leaves out annotations
+    pub fn translate_rule_operations_without_annotations(
+        &self,
+        rule: &NormalizedRule,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Vec<Bool> {
+        rule.operations()
+            .iter()
+            .map(|b| {
+                self.translate_operation(b, &var_cache)
+                    .as_bool()
+                    .expect("Top level operations should have Sort Bool")
+            })
+            .collect()
     }
 
     /// Translates assertion for a fact (ground atom)

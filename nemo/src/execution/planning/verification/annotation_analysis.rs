@@ -2,27 +2,18 @@
 
 use std::collections::HashSet;
 
-use graph_cycles::Cycles;
-use petgraph::Graph;
-
 use crate::{
     execution::{
         planning::{
             normalization::{
                 global_annotation::NormalizedGlobalAnnotation, program::NormalizedProgram,
-                rule::NormalizedRule,
             },
             verification::{
-                annotation_analysis::{
-                    propagation_graph::PropagationGraph, rule_selection::RuleAnalysisGraph,
-                },
-                edb_analysis::{self, EdbAnalyzer},
-                rule_verification::RuleVerifier,
+                annotation_analysis::rule_selection::RuleAnalysisGraph, edb_analysis::EdbAnalyzer,
+                rule_verification::RuleVerifier, termination_verification::TerminationVerifier,
             },
         },
-        selection_strategy::dependency_graph::{
-            graph_constructor::DependencyGraphConstructor, graph_positive::GraphConstructorPositive,
-        },
+        selection_strategy::dependency_graph::graph_positive::GraphConstructorPositive,
     },
     rule_model::components::tag::Tag,
 };
@@ -189,10 +180,6 @@ impl AnnotationAnalyzer {
                 }
             }
 
-            let prop_graph = PropagationGraph::build_graph(&scc, self.program.rules());
-            prop_graph.print_graph();
-            println!("weakly acyclic: {}", prop_graph.is_weakly_acyclic());
-
             let mut delta = true;
             while delta {
                 //TODO: put back delta maybe
@@ -206,31 +193,20 @@ impl AnnotationAnalyzer {
                 }
             }
         }
+        self.check_termination(&verifier);
     }
 
     /// Checks whether termination of the program can be verified
     /// Move to own module
-    pub fn check_termination(&mut self) -> bool {
+    pub fn check_termination(&mut self, rule_verifier: &RuleVerifier) -> bool {
         let edb_analyser = EdbAnalyzer::new(self.program(), self.rule_graph.clone());
+        let restrictions = rule_verifier.predicate_restriction();
+        let verifier = TerminationVerifier::new(edb_analyser, restrictions.clone());
         self.rule_graph.reset_scc_count();
         while let Some(scc) = self.rule_graph.next_scc() {
-            let propagation_graph = PropagationGraph::build_graph(&scc, self.program.rules());
-            if propagation_graph.is_weakly_acyclic() {
-                // scc acyclic
-            } else {
-            }
+            println!("checking scc");
+            verifier.check_scc_cycles(&self.program, &scc);
         }
-
         true
-    }
-
-    /// checks whether the subgraph has critical cycles
-    /// Move to own module
-    pub fn check_critical_cycles(&self, scc: Vec<usize>, propagation_graph: &PropagationGraph) {
-        let special_cycles = propagation_graph.special_cycles();
-        for cycle in special_cycles {
-            // get all other cycles starting with the same predicate with same rule word attached
-            // Check if at least one is bound (lower or upper or in general, depending on annotation)
-        }
     }
 }

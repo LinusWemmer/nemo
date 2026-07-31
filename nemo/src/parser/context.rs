@@ -179,8 +179,8 @@ pub enum ParserContext {
     #[assoc(name = "global annotation")]
     GlobalAnnotation,
     /// Input Annotation
-    #[assoc(name = "input annotation")]
-    InputAnnotation,
+    #[assoc(name = "termination annotation")]
+    TerminationAnnotation,
     /// Type Annotation
     #[assoc(name = "type annotation")]
     TypeAnnotation,

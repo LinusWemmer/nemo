@@ -155,6 +155,17 @@ impl NormalizedProgram {
             .collect()
     }
 
+    /// Returns the termination annotation for the given predicate
+    pub fn predicate_to_termination_annotation(
+        &self,
+        predicate: &Tag,
+    ) -> Vec<&NormalizedTerminationAnnotation> {
+        self.termination_annotations
+            .iter()
+            .filter(|a| &a.head().predicate() == predicate)
+            .collect()
+    }
+
     /// Return all global annotations for the given predicate
     pub fn predicate_to_type_annotation(&self, predicate: &Tag) -> Vec<&NormalizedTypeAnnotation> {
         self.type_annotations
