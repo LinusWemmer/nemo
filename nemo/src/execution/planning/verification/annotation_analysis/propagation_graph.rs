@@ -137,11 +137,12 @@ impl PropagationGraph {
         let rule_graph = self.rule_graph_from_propagation_graph();
         for cycle in rule_graph.cycles() {
             let size = cycle.len();
+
             if cycle.iter().enumerate().any(|(c_i, current_node)| {
                 let c_j = (c_i + 1) % size;
                 let next_node: NodeIndex = cycle[c_j];
-                if let Some(edge_index) = self.graph.find_edge(*current_node, next_node) {
-                    self.graph.edge_weight(edge_index).expect("msg").1
+                if let Some(edge_index) = rule_graph.find_edge(*current_node, next_node) {
+                    *rule_graph.edge_weight(edge_index).expect("msg")
                 } else {
                     false
                 }

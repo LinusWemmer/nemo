@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use z3::{
-    Optimize, Solver,
+    Solver,
     ast::{Ast, Bool, Int, forall_const},
 };
 
@@ -32,18 +32,18 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct TerminationVerifier {
     edb_predicates: EdbAnalyzer,
-    predicate_restrictions: HashMap<Tag, Restriction>,
+    _predicate_restrictions: HashMap<Tag, Restriction>,
 }
 
 impl TerminationVerifier {
     /// Create a new [RuleVerifier]
     pub fn new(
         edb_predicates: EdbAnalyzer,
-        predicate_restrictions: HashMap<Tag, Restriction>,
+        _predicate_restrictions: HashMap<Tag, Restriction>,
     ) -> Self {
         Self {
             edb_predicates,
-            predicate_restrictions,
+            _predicate_restrictions,
         }
     }
 }
@@ -445,12 +445,13 @@ impl TerminationVerifier {
         } else {
             println!("not weakly acyclic");
             let cycles = propagation_graph.all_special_rules_cycles();
-
+            println!("{:?}", cycles);
             for cycle in cycles {
                 let rule_cycle: Vec<&NormalizedRule> =
                     cycle.iter().map(|r_i| &program.rules()[*r_i]).collect();
                 let termination_proven =
                     self.check_all_annotated_cycle_permutations(&rule_cycle, program);
+
                 if !termination_proven {
                     print!("Termination for cycle: ");
                     // TODO: make pretty

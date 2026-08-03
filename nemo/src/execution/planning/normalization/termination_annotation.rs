@@ -82,7 +82,11 @@ impl NormalizedTerminationAnnotation {
 
 impl Display for NormalizedTerminationAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#assert ")?;
+        match self.direction {
+            TerminationDirection::Decreasing => f.write_str("#decreases: ")?,
+            TerminationDirection::Increasing => f.write_str("#increases: ")?,
+        };
+
         let pred = &self.head().to_string();
         write!(f, "{pred}")?;
         f.write_str(": ")?;
