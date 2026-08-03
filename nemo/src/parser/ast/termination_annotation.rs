@@ -1,4 +1,4 @@
-//! This module defines [InputAnnotation].
+//! This module defines [TerminationAnnotation].
 #![allow(missing_docs)]
 
 use enum_assoc::Assoc;

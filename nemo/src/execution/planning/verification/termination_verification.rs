@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use z3::{
     Optimize, Solver,
-    ast::{Ast, Bool, Int},
+    ast::{Ast, Bool, Int, forall_const},
 };
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
         normalization::{
             program::NormalizedProgram, rule::NormalizedRule,
             termination_annotation::NormalizedTerminationAnnotation,
+            termination_annotation::TerminationDirection,
         },
         verification::{
             annotation_analysis::propagation_graph::PropagationGraph,
@@ -57,6 +58,16 @@ impl TerminationVerifier {
             })
             .collect()
     }
+
+    /// Prints a rule cycle, TODO: make pretty
+    pub fn print_cycle(cycle: &Vec<&NormalizedRule>) {
+        print!("(");
+        for rule in cycle {
+            print!("{rule}, ")
+        }
+        println!(")")
+    }
+
     /// Generates the unfolded representation of the loop
     /// Returns in order:
     /// * The expressions used in the unfolded loop in smtlib rep
@@ -67,7 +78,7 @@ impl TerminationVerifier {
         cycle: &Vec<&NormalizedRule>,
         annotation: &NormalizedTerminationAnnotation,
         incremental_predicate: &Tag,
-    ) -> (Vec<Bool>, Vec<Int>, Int, HashSet<Int>) {
+    ) -> (Vec<Bool>, Vec<Int>, Int, HashSet<Int>, HashSet<Int>) {
         let translator = RuleTranslator::new();
         let size = cycle.len();
 
@@ -75,6 +86,10 @@ impl TerminationVerifier {
         let mut var_cache_previous: HashMap<Variable, Int> = self.build_var_cache(current_rule, 0);
 
         let mut edb_vars = self.edb_vars_in_rule(current_rule, &var_cache_previous);
+        let mut cycle_vars: HashSet<Int> = current_rule
+            .variables()
+            .map(|v| var_cache_previous.get(v).expect("var should exist").clone())
+            .collect();
 
         let cycle_start_norm = current_rule
             .positive()
@@ -125,6 +140,16 @@ impl TerminationVerifier {
                     .collect();
                 edb_vars.extend(self.edb_vars_in_rule(current_rule, &var_cache_current));
 
+                cycle_vars = cycle_vars
+                    .iter()
+                    .map(|v| v.substitute(&substitution))
+                    .collect();
+                cycle_vars.extend(
+                    current_rule
+                        .variables()
+                        .map(|v| var_cache_previous.get(v).expect("var should exist").clone()),
+                );
+
                 var_cache_previous = var_cache_current.clone();
                 previous_rule_translation = current_rule_translation.clone();
             }
@@ -143,6 +168,7 @@ impl TerminationVerifier {
             cycle_start_norm,
             cycle_end_norm,
             edb_vars,
+            cycle_vars,
         )
     }
 
@@ -167,7 +193,7 @@ impl TerminationVerifier {
         &self,
         composed_cycle: &Vec<Bool>,
         cycle_start_norm: &Vec<Int>,
-        cycle_end_norm: Int,
+        cycle_end_norm: &Int,
         annotation: &NormalizedTerminationAnnotation,
     ) -> bool {
         let solver = Solver::new();
@@ -176,26 +202,41 @@ impl TerminationVerifier {
             solver.assert(statement);
         }
         let mut valid = true;
-        match annotation.direction(){
-            crate::execution::planning::normalization::termination_annotation::TerminationDirection::Decreasing => {
-                for starting_norm in cycle_start_norm{
+        match annotation.direction() {
+            TerminationDirection::Decreasing => {
+                for starting_norm in cycle_start_norm {
                     solver.push();
-                    solver.assert(starting_norm.gt(&cycle_end_norm).not());
+                    solver.assert(starting_norm.gt(cycle_end_norm).not());
                     println!("{}", solver.to_smt2());
-                    valid = valid &&  match solver.check() {
-                        z3::SatResult::Unsat => true,
-                        z3::SatResult::Unknown => {
-                            println!("Could not validate (unknown)");
-                            return false;
-                        }
-                        z3::SatResult::Sat => false,
-                    };
+                    valid = valid
+                        && match solver.check() {
+                            z3::SatResult::Unsat => true,
+                            z3::SatResult::Unknown => {
+                                println!("Could not validate (unknown)");
+                                return false;
+                            }
+                            z3::SatResult::Sat => false,
+                        };
                     solver.pop(1);
                 }
-            },
-            crate::execution::planning::normalization::termination_annotation::TerminationDirection::Increasing => for starting_norm in cycle_start_norm{
-                    solver.assert(starting_norm.lt(&cycle_end_norm).not());
-                },
+            }
+            TerminationDirection::Increasing => {
+                for starting_norm in cycle_start_norm {
+                    solver.push();
+                    solver.assert(starting_norm.lt(cycle_end_norm).not());
+                    println!("{}", solver.to_smt2());
+                    valid = valid
+                        && match solver.check() {
+                            z3::SatResult::Unsat => true,
+                            z3::SatResult::Unknown => {
+                                println!("Could not validate (unknown)");
+                                return false;
+                            }
+                            z3::SatResult::Sat => false,
+                        };
+                    solver.pop(1);
+                }
+            }
         }
         valid
     }
@@ -247,91 +288,152 @@ impl TerminationVerifier {
         }
     }
 
-    /// Returns true if an upper bound for the variable can be found for that rule
-    pub fn has_upper_bound(
+    /// Checks whether the cycle has an upper bound
+    pub fn expression_has_upper_bound(
         &self,
-        var: &Variable,
-        rule: &NormalizedRule,
-        program: &NormalizedProgram,
+        edb_vars: &HashSet<Int>,
+        composed_cycle: &Vec<Bool>,
+        cycle_vars: &HashSet<Int>,
+        norm: &Int,
     ) -> bool {
-        let translator = RuleTranslator::new();
-        let optimize = Optimize::new();
-
-        let var_cache = RuleVerifier::create_var_cache(rule);
-
-        let max_var = var_cache.get(var).expect("var should be regsitered");
-
-        let body_instance = translator.translate_rule(rule, &var_cache, program);
-        for term in body_instance {
-            optimize.assert(term);
+        let solver = Solver::new();
+        let hi = Int::fresh_const("hi");
+        //let lo = Int::fresh_const("lo");
+        let mut lhs = Vec::new();
+        for var in edb_vars {
+            let hi_edb = Int::fresh_const("hi_edb");
+            let lo_edb = Int::fresh_const("lo_edb");
+            lhs.push(lo_edb.le(var));
+            lhs.push(var.le(hi_edb));
         }
-
-        let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
-            self.predicate_restrictions
-                .get(&body_atom.predicate())
-                .and_then(|res| {
-                    println!("{body_atom} restriction: {res}");
-                    Some(res.get_restrictions_for_body(body_atom, &var_cache))
-                })
-        });
-        for guard in body_restrictions {
-            optimize.assert(guard);
-        }
-
-        optimize.maximize(max_var); // TODO: we can actually add the idea for checking here
-
-        optimize.check(&[]);
-
-        // maybe should output true if none, as the rule would never fire if it is unsat?
-        match optimize.get_upper(0) {
-            Some(a) => {
-                return !a.to_string().contains("oo");
+        lhs.extend(composed_cycle.iter().cloned());
+        let lhs_combined = Bool::and(&lhs);
+        let rhs = norm.le(hi);
+        let implies = lhs_combined.implies(rhs);
+        let args: Vec<&dyn Ast> = cycle_vars.iter().map(|v| -> &dyn Ast { v }).collect();
+        let formula = forall_const(&args, &[], &implies);
+        solver.assert(formula);
+        println!("{}", solver.to_smt2());
+        match solver.check() {
+            z3::SatResult::Unsat => false,
+            z3::SatResult::Unknown => {
+                println!("Could not validate (unknown)");
+                return false;
             }
-            None => false,
+            z3::SatResult::Sat => true,
         }
     }
 
-    /// Returns true if a lower bound can be found for that program & rule
-    pub fn has_lower_bound(
+    /// Checks whether the cycle has an upper bound
+    pub fn expression_has_lower_bound(
         &self,
-        var: &Variable,
-        rule: &NormalizedRule,
+        edb_vars: &HashSet<Int>,
+        composed_cycle: &Vec<Bool>,
+        cycle_vars: &HashSet<Int>,
+        norm: &Int,
+    ) -> bool {
+        let solver = Solver::new();
+        let lo = Int::fresh_const("lo");
+        //let lo = Int::fresh_const("lo");
+        let mut lhs = Vec::new();
+        for var in edb_vars {
+            let hi_edb = Int::fresh_const("hi_edb");
+            let lo_edb = Int::fresh_const("lo_edb");
+            lhs.push(lo_edb.le(var));
+            lhs.push(var.le(hi_edb));
+        }
+        lhs.extend(composed_cycle.iter().cloned());
+        let lhs_combined = Bool::and(&lhs);
+        let rhs = norm.ge(lo);
+        let implies = lhs_combined.implies(rhs);
+        let args: Vec<&dyn Ast> = cycle_vars.iter().map(|v| -> &dyn Ast { v }).collect();
+        let formula = forall_const(&args, &[], &implies);
+        solver.assert(formula);
+        println!("{}", solver.to_smt2());
+        match solver.check() {
+            z3::SatResult::Unsat => false,
+            z3::SatResult::Unknown => {
+                println!("Could not validate (unknown)");
+                return false;
+            }
+            z3::SatResult::Sat => true,
+        }
+    }
+
+    /// Checks if the permutated cycle terminates by the given termination annotation
+    pub fn cycle_terminates_by_annotation(
+        &self,
+        cycle: &Vec<&NormalizedRule>,
+        annotation: &NormalizedTerminationAnnotation,
+        cycle_predicate: &Tag,
+    ) -> bool {
+        let (composed_cycle, cycle_start_norm, cycle_end_norm, edb_vars, cycle_vars) =
+            self.compose_cycle(cycle, annotation, cycle_predicate);
+        if self.strictly_changes_argument(
+            &composed_cycle,
+            &cycle_start_norm,
+            &cycle_end_norm,
+            annotation,
+        ) {
+            println!("cycle strictly changes");
+            // Check bound
+            let has_bound = match annotation.direction() {
+                TerminationDirection::Decreasing => self.expression_has_lower_bound(
+                    &edb_vars,
+                    &composed_cycle,
+                    &cycle_vars,
+                    &cycle_end_norm,
+                ),
+                TerminationDirection::Increasing => self.expression_has_upper_bound(
+                    &edb_vars,
+                    &composed_cycle,
+                    &cycle_vars,
+                    &cycle_end_norm,
+                ),
+            };
+            has_bound
+        } else {
+            false
+        }
+    }
+
+    /// Check whether for any permutation of a cycle with a fitting annotation, termination can be proven
+    pub fn check_all_annotated_cycle_permutations(
+        &self,
+        rule_cycle: &Vec<&NormalizedRule>,
         program: &NormalizedProgram,
     ) -> bool {
-        let translator = RuleTranslator::new();
-        let optimize = Optimize::new();
+        let cycle_len = rule_cycle.len();
+        let potential_starts: Vec<usize> = rule_cycle
+            .iter()
+            .enumerate()
+            .filter(|(_, rule)| {
+                program.has_termination_annotation_predicate(&rule.head()[0].predicate())
+            })
+            .map(|(p, _)| p)
+            .collect();
 
-        let var_cache = RuleVerifier::create_var_cache(rule);
+        for start in potential_starts {
+            let permutated_cycle: Vec<&NormalizedRule> = rule_cycle
+                .iter()
+                .cycle()
+                .skip(start)
+                .take(cycle_len)
+                .cloned()
+                .collect();
 
-        let min_var = var_cache.get(var).expect("var should be regsitered");
-
-        let body_instance = translator.translate_rule(rule, &var_cache, program);
-        for term in body_instance {
-            optimize.assert(term);
+            let cycle_predicate = &permutated_cycle[0].head()[0].predicate();
+            let annotation = program.predicate_to_termination_annotation(cycle_predicate)[0];
+            let terminates_by_annotation =
+                self.cycle_terminates_by_annotation(&permutated_cycle, annotation, cycle_predicate);
+            if terminates_by_annotation {
+                print!("Termination for cycle ");
+                TerminationVerifier::print_cycle(&permutated_cycle);
+                println!("could be verified with annotation {annotation}.");
+                return true;
+            }
         }
-
-        //might be enough to check restrictions on their own :)
-        let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
-            self.predicate_restrictions
-                .get(&body_atom.predicate())
-                .and_then(|res| {
-                    println!("{body_atom} restriction: {res}");
-                    Some(res.get_restrictions_for_body(body_atom, &var_cache))
-                })
-        });
-        for guard in body_restrictions {
-            optimize.assert(guard);
-        }
-
-        optimize.minimize(min_var); // TODO: we can actually add the idea for checking here
-
-        optimize.check(&[]);
-
-        // maybe should output true if none, as the rule would never fire if it is unsat?
-        match optimize.get_lower(0) {
-            Some(a) => !a.to_string().contains("oo"),
-            None => false,
-        }
+        false
     }
 
     /// Checks all cycles for the scc
@@ -341,60 +443,22 @@ impl TerminationVerifier {
             println!("weakly acyclic");
             return true;
         } else {
+            println!("not weakly acyclic");
             let cycles = propagation_graph.all_special_rules_cycles();
+
             for cycle in cycles {
                 let rule_cycle: Vec<&NormalizedRule> =
                     cycle.iter().map(|r_i| &program.rules()[*r_i]).collect();
-                let cycle_len = rule_cycle.len();
-                //TODO: check all possible starts, this might actually return nothing or panic if we return to start
-                let permutated_cycle: Vec<&NormalizedRule> = rule_cycle
-                    .iter()
-                    .cycle()
-                    .skip_while(|rule| {
-                        !program
-                            .predicate_to_termination_annotation(&rule.head()[0].predicate())
-                            .is_empty()
-                    })
-                    .take(cycle_len)
-                    .cloned()
-                    .collect();
-
-                let cycle_predicate = &permutated_cycle[0].head()[0].predicate();
-
-                let annotation = program.predicate_to_termination_annotation(cycle_predicate)[0];
-                let (composed_cycle, cycle_start_norm, cycle_end_norm, _) =
-                    self.compose_cycle(&permutated_cycle, annotation, cycle_predicate);
-                if self.strictly_changes_argument(
-                    &composed_cycle,
-                    &cycle_start_norm,
-                    cycle_end_norm,
-                    annotation,
-                ) {
-                    println!("cycle strictly changes");
-                    // Check bound
-                } else {
-                    // Check next annotation or something
+                let termination_proven =
+                    self.check_all_annotated_cycle_permutations(&rule_cycle, program);
+                if !termination_proven {
+                    print!("Termination for cycle: ");
+                    // TODO: make pretty
+                    println!("{:?}", cycle);
+                    println!(
+                        "could not be verified. Consider adding annotations if you believe the cycle terminates"
+                    );
                 }
-                //TODO: check strict! increase/decrease of annotation for now: assume increase
-                /*    for (rule_index, special) in cycle_rules {
-                    let rule = &program.rules()[rule_index];
-                    let pos =
-                        propagation_graph.node_predicate_pos(permutated_cycle[rule_index]);
-
-                    let head = &rule.head()[0];
-                    if head.predicate() != pos.0 {
-                        println!("wrong head, fix")
-                    } else {
-                        let bound = match head.terms().nth(pos.1).expect("pos should exist") {
-                            Primitive::Variable(variable) => {
-                                self.edb_predicates.is_bound_by_edb(variable, rule)
-                                    || self.has_upper_bound(variable, rule, program)
-                            }
-                            Primitive::Ground(_) => true,
-                        };
-                        println!("{}[{}] is bound: {bound}! on cycle", pos.0, pos.1);
-                    }
-                }*/
             }
             true
         }

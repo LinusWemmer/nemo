@@ -5,11 +5,7 @@ use graph_cycles::Cycles;
 use itertools::Itertools;
 
 use crate::{
-    execution::planning::normalization::{
-        atom::{body::BodyAtom, head::HeadAtom},
-        operation::Operation,
-        rule::NormalizedRule,
-    },
+    execution::planning::normalization::{operation::Operation, rule::NormalizedRule},
     rule_model::components::{
         tag::Tag,
         term::{operation::operation_kind::OperationKind, primitive::Primitive::Variable},
@@ -23,7 +19,6 @@ use petgraph::{Directed, Direction, Graph, dot::Dot, prelude::NodeIndex, visit::
 pub struct PropagationGraph {
     /// Labelled graph of predicate positions. False if var in head&body, True if part of function
     graph: petgraph::graph::DiGraph<(Tag, usize), (usize, bool)>,
-    predicate_pos_to_node_index: HashMap<(Tag, usize), NodeIndex>,
 }
 
 impl PropagationGraph {
@@ -236,7 +231,7 @@ impl PropagationGraph {
 
         let predicates: HashSet<(Tag, usize)> =
             scc_rules.iter().flat_map(|(r, _)| r.predicates()).collect();
-        let mut predicate_pos_to_node_index = HashMap::default();
+        let mut predicate_pos_to_node_index: HashMap<(Tag, usize), NodeIndex> = HashMap::default();
 
         for (tag, arity) in predicates {
             for pos in 0..arity {
@@ -290,10 +285,7 @@ impl PropagationGraph {
                 }
             }
         }
-        Self {
-            graph,
-            predicate_pos_to_node_index,
-        }
+        Self { graph }
     }
 
     /// Returns true if the operation creates a new value for the variable

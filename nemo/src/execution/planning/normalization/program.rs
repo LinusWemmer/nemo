@@ -166,6 +166,13 @@ impl NormalizedProgram {
             .collect()
     }
 
+    /// Returns true if there is an annotation for the given predicate
+    pub fn has_termination_annotation_predicate(&self, predicate: &Tag) -> bool {
+        self.termination_annotations
+            .iter()
+            .any(|a| &a.head().predicate() == predicate)
+    }
+
     /// Return all global annotations for the given predicate
     pub fn predicate_to_type_annotation(&self, predicate: &Tag) -> Vec<&NormalizedTypeAnnotation> {
         self.type_annotations
