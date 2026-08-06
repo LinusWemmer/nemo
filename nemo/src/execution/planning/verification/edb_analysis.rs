@@ -132,7 +132,6 @@ impl EdbAnalyzer {
                 }
             }
         }
-        //println!("edb Positions: {:?}", edb_positions);
         Self { edb_positions }
     }
 

@@ -93,28 +93,6 @@ impl RuleTranslator {
             .expect("translating head atom went wrong")
     }
 
-    /// Translate a ground atom TODO: allow other types than int (also in general needed)
-    /// => Actuall not needed
-    /*pub fn translate_ground_atom(&self, atom: &GroundAtom) -> Bool {
-        let bool_sort = Sort::bool();
-        let int_sort = Sort::int();
-
-        let args_sort = vec![&int_sort; atom.arity()];
-        let pred = FuncDecl::new(atom.predicate().name(), &args_sort, &bool_sort);
-
-        let term_list: Vec<Int> = atom
-            .terms()
-            .map(|t| Int::from_i64(t.value().to_i64_unchecked()))
-            .collect();
-
-        // I have no idead why this works, it also seems very convoluted
-        let args: Vec<&dyn Ast> = term_list.iter().map(|v| -> &dyn Ast { v }).collect();
-
-        pred.apply(&args)
-            .as_bool()
-            .expect("translating groudnd atom went wrong")
-    }*/
-
     /// Translates a primitive into an int for now
     pub fn translate_primitive(&self, prim: &Primitive, var_cache: &HashMap<Variable, Int>) -> Int {
         match prim {
@@ -283,15 +261,15 @@ impl RuleTranslator {
         rule: &NormalizedRule,
         var_cache: &HashMap<Variable, Int>,
         program: &NormalizedProgram,
-    ) -> Vec<Bool> {
-        let mut body_terms = Vec::new();
+    ) -> (Vec<Bool>, Vec<Bool>) {
+        let mut body_annotations = Vec::new();
 
         //TODO: should this be moved to the verification, i.e. rule and assertion seperately?
         for atom in rule.positive() {
             //let smt_atom = self.translate_body_atom(atom, &var_cache);
             //body_terms.push(smt_atom); TODO: maybe still neccesary?
 
-            body_terms.extend(
+            body_annotations.extend(
                 program
                     .predicate_to_global_annotation(&atom.predicate())
                     .iter()
@@ -300,15 +278,31 @@ impl RuleTranslator {
         }
 
         // test if this is computationally feasible
-        let body_operations = rule.operations().iter().map(|b| {
-            self.translate_operation(b, &var_cache)
-                .as_bool()
-                .expect("Top level operations should have Sort Bool")
-        });
+        let body_operations = rule
+            .operations()
+            .iter()
+            .map(|b| {
+                self.translate_operation(b, &var_cache)
+                    .as_bool()
+                    .expect("Top level operations should have Sort Bool")
+            })
+            .collect();
 
-        body_terms.extend(body_operations);
+        (body_operations, body_annotations)
+    }
 
-        body_terms
+    /// Checks whether the given operation is a filter operation
+    pub fn is_filter_operation(restriction: &Bool) -> bool {
+        let children = restriction.children();
+        let left = children.first();
+        let right = children.get(1);
+        if restriction.is_app()
+            && let Some(t1) = left
+            && let Some(t2) = right
+        {
+            return (t1.is_const() || t1.is_app()) && (t2.is_const() || t2.is_app());
+        }
+        false
     }
 
     /// Translates a rule but leaves out annotations

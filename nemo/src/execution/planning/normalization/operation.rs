@@ -80,6 +80,67 @@ impl Operation {
         }
     }
 
+    /// Check whether this operation is a simple filter expression of the form x < c or similar
+    pub fn is_simple_filter(&self) -> bool {
+        let filter_exp = {
+            |kind: &OperationKind| match kind {
+                OperationKind::Equal => true,
+                OperationKind::Unequals => true,
+                OperationKind::NumericGreaterthaneq => true,
+                OperationKind::NumericGreaterthan => true,
+                OperationKind::NumericLessthaneq => true,
+                OperationKind::NumericLessthan => true,
+                _ => false,
+            }
+        };
+        match self {
+            Operation::Primitive(_) => false,
+            Operation::Opreation { kind, subterms } => {
+                let left = subterms.first().expect("invalid program component");
+                let right = subterms.get(1).expect("invalid program component");
+                if let Self::Primitive(Primitive::Variable(_)) = left
+                    && let Self::Primitive(Primitive::Ground(_)) = right
+                {
+                    filter_exp(kind)
+                } else if let Self::Primitive(Primitive::Variable(_)) = right
+                    && let Self::Primitive(Primitive::Ground(_)) = left
+                {
+                    filter_exp(kind)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    /// Check if two operations are equivalent up to renaming
+    pub fn equivalent_up_to_var_renaming(&self, other: &Operation) -> bool {
+        if let Self::Primitive(prim1) = self
+            && let Self::Primitive(prim2) = other
+        {
+            if prim1.is_ground() && prim2.is_ground() {
+                return prim1 == prim2;
+            } else if prim1.is_universal() && prim2.is_universal() {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        if let Self::Opreation { kind, subterms } = self {
+            let kind_self = kind;
+            let left_self = subterms.first().expect("invalid program component");
+            let right_self = subterms.get(1).expect("invalid program component");
+            if let Self::Opreation { kind, subterms } = other {
+                let left_other = subterms.first().expect("invalid program component");
+                let right_other = subterms.get(1).expect("invalid program component");
+                return kind_self == kind
+                    && left_self.equivalent_up_to_var_renaming(left_other)
+                    && right_self.equivalent_up_to_var_renaming(right_other);
+            }
+        };
+        false
+    }
+
     /// Return an iterator over all [AnyDataValue]s within this operation.
     pub fn datavalues(&self) -> Box<dyn Iterator<Item = AnyDataValue> + '_> {
         match self {

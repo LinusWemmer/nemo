@@ -7,7 +7,8 @@ use crate::execution::planning::{
         program::NormalizedProgram, rule::NormalizedRule,
     },
     verification::rule_verification::{
-        z3_goal::VerificationGoal, z3_restriction::Restriction, z3_translation::RuleTranslator,
+        filters::Filter, z3_goal::VerificationGoal, z3_restriction::Restriction,
+        z3_translation::RuleTranslator,
     },
 };
 
@@ -19,6 +20,7 @@ use z3::{
 };
 use z3::{Goal, Solver, Tactic};
 
+pub mod filters;
 pub mod z3_goal;
 pub mod z3_restriction;
 pub mod z3_translation;
@@ -31,6 +33,7 @@ pub struct RuleVerifier {
     predicate_restrictions: HashMap<Tag, Restriction>,
     /// Arguments that are used in the verification
     verification_goals: HashMap<Tag, VerificationGoal>,
+    filter_predicates: Vec<Filter>,
 }
 
 impl RuleVerifier {
@@ -40,6 +43,7 @@ impl RuleVerifier {
             fresh_var_counter: 0,
             predicate_restrictions: HashMap::new(),
             verification_goals: HashMap::new(),
+            filter_predicates: Vec::new(),
         }
     }
 
@@ -67,6 +71,39 @@ impl RuleVerifier {
                     v.clone(),
                     Int::fresh_const(v.name().expect("Anon vars not supported yet")),
                 )
+            })
+            .collect()
+    }
+
+    /// Gathers all filter expressions in the program
+    pub fn gather_filters(&mut self, program: &NormalizedProgram) {
+        let mut filters = Vec::new();
+        for rule in program.rules() {
+            let rule_filters = rule.operations().iter().filter(|b| b.is_simple_filter());
+            filters.extend(rule_filters);
+        }
+        for annotation in program.global_annotations() {
+            let annotation_filters = annotation.body().iter().filter(|b| b.is_simple_filter());
+            filters.extend(annotation_filters);
+        }
+        self.filter_predicates = filters.iter().map(|f| Filter::new(f)).collect();
+    }
+
+    /// Returns the restrictions placed on the body predicates
+    pub fn get_body_predicate_restrictions(
+        &self,
+        rule: &NormalizedRule,
+        var_cache: &HashMap<Variable, Int>,
+    ) -> Vec<Bool> {
+        rule.positive()
+            .iter()
+            .filter_map(|body_atom| {
+                self.predicate_restrictions
+                    .get(&body_atom.predicate())
+                    .and_then(|res| {
+                        println!("{body_atom} restriction: {res}");
+                        Some(res.get_restrictions_for_body(body_atom, var_cache))
+                    })
             })
             .collect()
     }
@@ -171,8 +208,13 @@ impl RuleVerifier {
         let translator = RuleTranslator::new();
 
         // Translate rule body
-        let body_instance = translator.translate_rule(rule, &var_cache, program);
-        for term in body_instance {
+        let (body_operations, body_annotations) =
+            translator.translate_rule(rule, &var_cache, program);
+        for term in body_operations {
+            solver.assert(term);
+        }
+
+        for term in body_annotations {
             solver.assert(term);
         }
 
@@ -240,9 +282,8 @@ impl RuleVerifier {
         true
     }
 
-    /// Propagates filters atoms from rule body to head, returns true if new info was gained
-    /// Doesn't  support input annotation at this point
-    pub fn verify_with_propagation(
+    /// Propagates filters atoms from rule head to body, returns true if new info was gained
+    pub fn verify_with_goal_propagation(
         &mut self,
         program: &NormalizedProgram,
         rule: &NormalizedRule,
@@ -262,9 +303,14 @@ impl RuleVerifier {
 
         let translator = RuleTranslator::new_with_predicates(predicate_to_z3_fun);
 
-        // Translate rule body TODO: split up annotation and other thing in body
-        let body_instance = translator.translate_rule(rule, &var_cache, program);
-        for term in body_instance {
+        // Translate rule body
+        let (body_operations, body_annotations) =
+            translator.translate_rule(rule, &var_cache, program);
+        for term in body_operations {
+            solver.assert(term);
+        }
+
+        for term in body_annotations {
             solver.assert(term);
         }
 
@@ -335,8 +381,68 @@ impl RuleVerifier {
         delta
     }
 
+    /// Propagates filter expressions through the program
+    pub fn forward_propagation_alt(
+        &mut self,
+        program: &NormalizedProgram,
+        rule: &NormalizedRule,
+    ) -> bool {
+        let mut delta = false;
+
+        let solver = Solver::new();
+
+        let var_cache = RuleVerifier::create_var_cache(rule);
+        let translator = RuleTranslator::new();
+
+        let (body_operations, body_annotations) =
+            translator.translate_rule(rule, &var_cache, program);
+        for op in body_operations {
+            solver.assert(&op);
+        }
+        for ann in body_annotations {
+            solver.assert(&ann);
+        }
+
+        let body_restrictions = self.get_body_predicate_restrictions(rule, &var_cache);
+        for res in body_restrictions {
+            solver.assert(&res);
+        }
+
+        let head = &rule.head()[0];
+
+        let mut head_filters: Vec<Bool> = Vec::new();
+        for filter in &self.filter_predicates {
+            for term in head.terms() {
+                solver.push();
+                let filter_head = filter.get_filter(&term, &var_cache);
+                solver.assert(&filter_head.not());
+                match solver.check() {
+                    z3::SatResult::Unsat => head_filters.push(filter_head.clone()),
+                    _ => {}
+                };
+                solver.pop(1);
+            }
+        }
+
+        if !head_filters.is_empty() {
+            let head_res = Bool::and(&head_filters);
+            self.predicate_restrictions
+                .entry(head.predicate())
+                .and_modify(|res| {
+                    delta =
+                        delta || res.add_restriction_from_propagation(head, &var_cache, &head_res);
+                })
+                .or_insert_with(|| {
+                    delta = true;
+                    Restriction::new_from_propagation(head, &var_cache, &head_res)
+                });
+        }
+
+        delta
+    }
+
     /// verifies a rule and propagates restriction from the body to the head
-    pub fn forward_propagation(&mut self, program: &NormalizedProgram, rule: &NormalizedRule) {
+    /*pub fn forward_propagation(&mut self, program: &NormalizedProgram, rule: &NormalizedRule) {
         let goal = Goal::new(false, false, false);
         let tactic_qe = Tactic::new("qe");
 
@@ -344,7 +450,7 @@ impl RuleVerifier {
         let var_cache = RuleVerifier::create_var_cache(rule);
 
         // Translate rule body
-        let mut body_instance = translator.translate_rule(rule, &var_cache, program);
+        let mut (body_operations, body_annotations) = translator.translate_rule(rule, &var_cache, program);
         let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
             self.predicate_restrictions
                 .get(&body_atom.predicate())
@@ -388,7 +494,7 @@ impl RuleVerifier {
                     ));
             }
         }
-    }
+    }*/
 
     /// Verifies a rule like the function verify_rule, but includes possible propagated restrictions from the rule body
     pub fn verify_with_restrictions(
@@ -403,19 +509,17 @@ impl RuleVerifier {
         let translator = RuleTranslator::new();
 
         // Translate rule body
-        let body_instance = translator.translate_rule(rule, &var_cache, program);
-        for term in body_instance {
+        let (body_operations, body_annotations) =
+            translator.translate_rule(rule, &var_cache, program);
+        for term in body_operations {
+            solver.assert(term);
+        }
+        for term in body_annotations {
             solver.assert(term);
         }
 
-        let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
-            self.predicate_restrictions
-                .get(&body_atom.predicate())
-                .and_then(|res| {
-                    println!("{body_atom} restriction: {res}");
-                    Some(res.get_restrictions_for_body(body_atom, &var_cache))
-                })
-        });
+        let body_restrictions = self.get_body_predicate_restrictions(rule, &var_cache);
+
         for op in body_restrictions {
             solver.assert(op);
         }

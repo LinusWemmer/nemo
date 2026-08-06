@@ -5,7 +5,9 @@ use graph_cycles::Cycles;
 use itertools::Itertools;
 
 use crate::{
-    execution::planning::normalization::{operation::Operation, rule::NormalizedRule},
+    execution::planning::normalization::{
+        operation::Operation, program::NormalizedProgram, rule::NormalizedRule,
+    },
     rule_model::components::{
         tag::Tag,
         term::{operation::operation_kind::OperationKind, primitive::Primitive::Variable},
@@ -119,7 +121,7 @@ impl PropagationGraph {
         for cycle in self.graph.cycles() {
             let size = cycle.len();
             if cycle.iter().enumerate().any(|(c_i, current_node)| {
-                let c_j = c_i + 1 % size;
+                let c_j = (c_i + 1) % size;
                 let next_node: NodeIndex = cycle[c_j];
                 self.graph
                     .edges_connecting(*current_node, next_node)
@@ -161,13 +163,22 @@ impl PropagationGraph {
         special_cycles
     }
 
+    pub fn cycles_without_predicates(
+        &self,
+        rule_graph: Graph<usize, bool>,
+        excluded_predicates: &Vec<Tag>,
+        program: &NormalizedProgram,
+    ) -> Vec<Vec<usize>> {
+        todo!();
+    }
+
     /// Builds a rule dependency graph from the propagation graph.
     /// Nodes are rule indices. There is an edge r1 -> r2 if some predicate
     /// position has an incoming edge labeled r1 (r1 writes to it, as a head)
     /// and an outgoing edge labeled r2 (r2 reads from it, as a body atom).
     /// Edge weight is true if either contributing propagation-graph edge was critical.
     pub fn rule_graph_from_propagation_graph(&self) -> Graph<usize, bool, Directed> {
-        let mut rule_graph = Graph::new();
+        let mut rule_graph: Graph<usize, bool> = Graph::new();
         let mut rule_to_node: HashMap<usize, NodeIndex> = HashMap::new();
 
         // Create one rule-graph node per distinct rule index appearing in the propagation graph

@@ -145,7 +145,7 @@ impl AnnotationAnalyzer {
                 for rule_index in &scc {
                     let rule = &self.program.rules()[*rule_index];
                     println!("Checking rule {rule_index}: {rule}");
-                    delta = verifier.verify_with_propagation(self.program(), &rule) || delta;
+                    delta = verifier.verify_with_goal_propagation(self.program(), &rule) || delta;
                 }
             }
         }
@@ -169,17 +169,10 @@ impl AnnotationAnalyzer {
 
         self.rule_graph.reset_scc_count();
 
+        verifier.gather_filters(&self.program);
+
         // Do a topological bottom up propagation & verification
         while let Some(scc) = self.rule_graph.next_scc() {
-            if scc.len() == 1 {
-                let rule = &self.program.rules()[scc[0]];
-                if !rule.is_recursive() {
-                    verifier.forward_propagation(self.program(), rule);
-                    verifier.verify_with_restrictions(self.program(), rule);
-                    continue;
-                }
-            }
-
             let mut delta = true;
             while delta {
                 //TODO: put back delta maybe
@@ -189,6 +182,7 @@ impl AnnotationAnalyzer {
                     let rule = &self.program.rules()[*rule_index];
                     println!("Checking rule {rule_index}: {rule}");
                     //TODO: do check whether recursive, don't do scc, but topological rule sort
+                    delta = delta || verifier.forward_propagation_alt(self.program(), rule);
                     verifier.verify_with_restrictions(self.program(), &rule);
                 }
             }
@@ -201,7 +195,8 @@ impl AnnotationAnalyzer {
     pub fn check_termination(&mut self, rule_verifier: &RuleVerifier) -> bool {
         let edb_analyser = EdbAnalyzer::new(self.program(), self.rule_graph.clone());
         let restrictions = rule_verifier.predicate_restriction();
-        let verifier = TerminationVerifier::new(edb_analyser, restrictions.clone());
+        let verifier =
+            TerminationVerifier::new(edb_analyser, restrictions.clone(), self.program.clone());
         self.rule_graph.reset_scc_count();
         while let Some(scc) = self.rule_graph.next_scc() {
             if scc.len() == 1 {
@@ -211,7 +206,7 @@ impl AnnotationAnalyzer {
             }
             println!("checking scc: {:?}", scc);
 
-            verifier.check_scc_cycles(&self.program, &scc);
+            verifier.check_scc_cycles(&scc);
         }
         true
     }

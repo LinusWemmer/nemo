@@ -125,7 +125,7 @@ impl Restriction {
     }
 
     /// Checks whether the given operation is actually a valid restriction (i.e. some form of y<c or x<y or similar)
-    pub fn is_valid_operation(restriction: &Bool) -> bool {
+    pub fn is_filter_operation(restriction: &Bool) -> bool {
         let children = restriction.children();
         let left = children.first();
         let right = children.get(1);

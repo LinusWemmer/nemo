@@ -33,6 +33,7 @@ use crate::{
 pub struct TerminationVerifier {
     edb_predicates: EdbAnalyzer,
     _predicate_restrictions: HashMap<Tag, Restriction>,
+    program: NormalizedProgram,
 }
 
 impl TerminationVerifier {
@@ -40,10 +41,12 @@ impl TerminationVerifier {
     pub fn new(
         edb_predicates: EdbAnalyzer,
         _predicate_restrictions: HashMap<Tag, Restriction>,
+        program: NormalizedProgram,
     ) -> Self {
         Self {
             edb_predicates,
             _predicate_restrictions,
+            program,
         }
     }
 }
@@ -83,10 +86,12 @@ impl TerminationVerifier {
         let size = cycle.len();
 
         let mut current_rule = cycle[0];
+        println!("cr: {current_rule}");
+        //println!("inc pred: {incremental_predicate}");
         let mut var_cache_previous: HashMap<Variable, Int> = self.build_var_cache(current_rule, 0);
 
         let mut edb_vars = self.edb_vars_in_rule(current_rule, &var_cache_previous);
-        let mut cycle_vars: HashSet<Int> = current_rule
+        let mut variables_in_cycle: HashSet<Int> = current_rule
             .variables()
             .map(|v| var_cache_previous.get(v).expect("var should exist").clone())
             .collect();
@@ -101,15 +106,20 @@ impl TerminationVerifier {
             .collect();
 
         //TODO: add back in support for annotation or at least restrictions
-        let mut previous_rule_translation = translator
-            .translate_rule_operations_without_annotations(&current_rule, &var_cache_previous);
-        let previous_head = &current_rule.head()[0];
+        let mut complete_rule_translation: Vec<Bool> = Vec::new();
+
+        let (previous_rule_body, previous_rule_annotations) =
+            translator.translate_rule(&current_rule, &var_cache_previous, &self.program);
+        complete_rule_translation.extend(previous_rule_body);
+        complete_rule_translation.extend(previous_rule_annotations);
+        let mut previous_head = &current_rule.head()[0];
 
         for c_i in 1..size {
             current_rule = cycle[c_i];
             let var_cache_current: HashMap<Variable, Int> = self.build_var_cache(current_rule, c_i);
-            let mut current_rule_translation = translator
-                .translate_rule_operations_without_annotations(&current_rule, &var_cache_current);
+
+            let (current_rule_body, current_rule_annotatios) =
+                translator.translate_rule(&current_rule, &var_cache_current, &self.program);
             //TODO: joins have to be handled more carefully
             for previous_head_occurence in current_rule
                 .positive()
@@ -128,30 +138,32 @@ impl TerminationVerifier {
                     })
                     .collect();
 
-                //TODO: check upper /lower boudn: also x<edb
-                current_rule_translation.extend(
-                    previous_rule_translation
-                        .iter()
-                        .map(|f| f.substitute(&substitution)),
-                );
+                complete_rule_translation = complete_rule_translation
+                    .iter()
+                    .map(|f| f.substitute(&substitution))
+                    .collect();
+
+                complete_rule_translation.extend(current_rule_body.clone());
+                complete_rule_translation.extend(current_rule_annotatios.clone());
+
                 edb_vars = edb_vars
                     .iter()
                     .map(|v| v.substitute(&substitution))
                     .collect();
                 edb_vars.extend(self.edb_vars_in_rule(current_rule, &var_cache_current));
 
-                cycle_vars = cycle_vars
+                variables_in_cycle = variables_in_cycle
                     .iter()
                     .map(|v| v.substitute(&substitution))
                     .collect();
-                cycle_vars.extend(
+                variables_in_cycle.extend(
                     current_rule
                         .variables()
-                        .map(|v| var_cache_previous.get(v).expect("var should exist").clone()),
+                        .map(|v| var_cache_current.get(v).expect("var should exist").clone()),
                 );
 
                 var_cache_previous = var_cache_current.clone();
-                previous_rule_translation = current_rule_translation.clone();
+                previous_head = &current_rule.head()[0];
             }
         }
 
@@ -164,11 +176,11 @@ impl TerminationVerifier {
             .clone();
 
         (
-            previous_rule_translation,
+            complete_rule_translation,
             cycle_start_norm,
             cycle_end_norm,
             edb_vars,
-            cycle_vars,
+            variables_in_cycle,
         )
     }
 
@@ -182,7 +194,7 @@ impl TerminationVerifier {
         rule: &NormalizedRule,
         var_cache: &HashMap<Variable, Int>,
     ) -> HashSet<Int> {
-        let edb_variables: HashSet<Variable> = self.edb_predicates.bound_vars_in_rule(rule);
+        let edb_variables: HashSet<Variable> = self.edb_predicates.edb_vars_in_rule(rule);
         edb_variables
             .iter()
             .map(|v| var_cache.get(v).expect("var should exist").clone())
@@ -207,7 +219,7 @@ impl TerminationVerifier {
                 for starting_norm in cycle_start_norm {
                     solver.push();
                     solver.assert(starting_norm.gt(cycle_end_norm).not());
-                    println!("{}", solver.to_smt2());
+                    //println!("{}", solver.to_smt2());
                     valid = valid
                         && match solver.check() {
                             z3::SatResult::Unsat => true,
@@ -224,7 +236,7 @@ impl TerminationVerifier {
                 for starting_norm in cycle_start_norm {
                     solver.push();
                     solver.assert(starting_norm.lt(cycle_end_norm).not());
-                    println!("{}", solver.to_smt2());
+                    //println!("{}", solver.to_smt2());
                     valid = valid
                         && match solver.check() {
                             z3::SatResult::Unsat => true,
@@ -254,8 +266,12 @@ impl TerminationVerifier {
         let var_cache = RuleVerifier::create_var_cache(rule);
         let translator = RuleTranslator::new();
 
-        let body_instance = translator.translate_rule(rule, &var_cache, program);
-        for term in body_instance {
+        let (body_operations, body_annotations) =
+            translator.translate_rule(rule, &var_cache, program);
+        for term in body_operations {
+            solver.assert(term);
+        }
+        for term in body_annotations {
             solver.assert(term);
         }
 
@@ -293,7 +309,7 @@ impl TerminationVerifier {
         &self,
         edb_vars: &HashSet<Int>,
         composed_cycle: &Vec<Bool>,
-        cycle_vars: &HashSet<Int>,
+        vars_in_cycle: &HashSet<Int>,
         norm: &Int,
     ) -> bool {
         let solver = Solver::new();
@@ -310,10 +326,10 @@ impl TerminationVerifier {
         let lhs_combined = Bool::and(&lhs);
         let rhs = norm.le(hi);
         let implies = lhs_combined.implies(rhs);
-        let args: Vec<&dyn Ast> = cycle_vars.iter().map(|v| -> &dyn Ast { v }).collect();
+        let args: Vec<&dyn Ast> = vars_in_cycle.iter().map(|v| -> &dyn Ast { v }).collect();
         let formula = forall_const(&args, &[], &implies);
         solver.assert(formula);
-        println!("{}", solver.to_smt2());
+        //println!("{}", solver.to_smt2());
         match solver.check() {
             z3::SatResult::Unsat => false,
             z3::SatResult::Unknown => {
@@ -329,7 +345,7 @@ impl TerminationVerifier {
         &self,
         edb_vars: &HashSet<Int>,
         composed_cycle: &Vec<Bool>,
-        cycle_vars: &HashSet<Int>,
+        var_in_cycle: &HashSet<Int>,
         norm: &Int,
     ) -> bool {
         let solver = Solver::new();
@@ -346,7 +362,7 @@ impl TerminationVerifier {
         let lhs_combined = Bool::and(&lhs);
         let rhs = norm.ge(lo);
         let implies = lhs_combined.implies(rhs);
-        let args: Vec<&dyn Ast> = cycle_vars.iter().map(|v| -> &dyn Ast { v }).collect();
+        let args: Vec<&dyn Ast> = var_in_cycle.iter().map(|v| -> &dyn Ast { v }).collect();
         let formula = forall_const(&args, &[], &implies);
         solver.assert(formula);
         println!("{}", solver.to_smt2());
@@ -367,7 +383,7 @@ impl TerminationVerifier {
         annotation: &NormalizedTerminationAnnotation,
         cycle_predicate: &Tag,
     ) -> bool {
-        let (composed_cycle, cycle_start_norm, cycle_end_norm, edb_vars, cycle_vars) =
+        let (composed_cycle, cycle_start_norm, cycle_end_norm, edb_vars, vars_in_cycle) =
             self.compose_cycle(cycle, annotation, cycle_predicate);
         if self.strictly_changes_argument(
             &composed_cycle,
@@ -381,13 +397,13 @@ impl TerminationVerifier {
                 TerminationDirection::Decreasing => self.expression_has_lower_bound(
                     &edb_vars,
                     &composed_cycle,
-                    &cycle_vars,
+                    &vars_in_cycle,
                     &cycle_end_norm,
                 ),
                 TerminationDirection::Increasing => self.expression_has_upper_bound(
                     &edb_vars,
                     &composed_cycle,
-                    &cycle_vars,
+                    &vars_in_cycle,
                     &cycle_end_norm,
                 ),
             };
@@ -401,14 +417,14 @@ impl TerminationVerifier {
     pub fn check_all_annotated_cycle_permutations(
         &self,
         rule_cycle: &Vec<&NormalizedRule>,
-        program: &NormalizedProgram,
     ) -> bool {
         let cycle_len = rule_cycle.len();
         let potential_starts: Vec<usize> = rule_cycle
             .iter()
             .enumerate()
             .filter(|(_, rule)| {
-                program.has_termination_annotation_predicate(&rule.head()[0].predicate())
+                self.program
+                    .has_termination_annotation_predicate(&rule.head()[0].predicate())
             })
             .map(|(p, _)| p)
             .collect();
@@ -422,14 +438,21 @@ impl TerminationVerifier {
                 .cloned()
                 .collect();
 
-            let cycle_predicate = &permutated_cycle[0].head()[0].predicate();
-            let annotation = program.predicate_to_termination_annotation(cycle_predicate)[0];
+            let cycle_predicate = &permutated_cycle
+                .last()
+                .expect("there should be a last element in cycle")
+                .head()[0]
+                .predicate();
+            let annotation = self
+                .program
+                .predicate_to_termination_annotation(cycle_predicate)[0];
             let terminates_by_annotation =
                 self.cycle_terminates_by_annotation(&permutated_cycle, annotation, cycle_predicate);
             if terminates_by_annotation {
                 print!("Termination for cycle ");
                 TerminationVerifier::print_cycle(&permutated_cycle);
                 println!("could be verified with annotation {annotation}.");
+                // Check all other potential cycles
                 return true;
             }
         }
@@ -437,8 +460,8 @@ impl TerminationVerifier {
     }
 
     /// Checks all cycles for the scc
-    pub fn check_scc_cycles(&self, program: &NormalizedProgram, scc: &Vec<usize>) -> bool {
-        let propagation_graph = PropagationGraph::build_graph(&scc, program.rules());
+    pub fn check_scc_cycles(&self, scc: &Vec<usize>) -> bool {
+        let propagation_graph = PropagationGraph::build_graph(&scc, self.program.rules());
         if propagation_graph.is_weakly_acyclic() {
             println!("weakly acyclic");
             return true;
@@ -447,15 +470,18 @@ impl TerminationVerifier {
             let cycles = propagation_graph.all_special_rules_cycles();
             println!("{:?}", cycles);
             for cycle in cycles {
-                let rule_cycle: Vec<&NormalizedRule> =
-                    cycle.iter().map(|r_i| &program.rules()[*r_i]).collect();
-                let termination_proven =
-                    self.check_all_annotated_cycle_permutations(&rule_cycle, program);
+                let rule_cycle: Vec<&NormalizedRule> = cycle
+                    .iter()
+                    .map(|r_i| &self.program.rules()[*r_i])
+                    .collect();
+                println!("checking cycle: {:?}", cycle);
+                //TerminationVerifier::print_cycle(&rule_cycle);
+                let termination_proven = self.check_all_annotated_cycle_permutations(&rule_cycle);
 
                 if !termination_proven {
                     print!("Termination for cycle: ");
                     // TODO: make pretty
-                    println!("{:?}", cycle);
+                    TerminationVerifier::print_cycle(&rule_cycle);
                     println!(
                         "could not be verified. Consider adding annotations if you believe the cycle terminates"
                     );
