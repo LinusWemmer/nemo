@@ -5,9 +5,7 @@ use graph_cycles::Cycles;
 use itertools::Itertools;
 
 use crate::{
-    execution::planning::normalization::{
-        operation::Operation, program::NormalizedProgram, rule::NormalizedRule,
-    },
+    execution::planning::normalization::{operation::Operation, rule::NormalizedRule},
     rule_model::components::{
         tag::Tag,
         term::{operation::operation_kind::OperationKind, primitive::Primitive::Variable},
@@ -35,7 +33,7 @@ impl PropagationGraph {
     }
 
     /// Returns all special cycles
-    /// TODO: multigraph
+    /// TODO: multigraph, ie.e fix line 44
     pub fn special_cycles(&self) -> Vec<Vec<NodeIndex>> {
         let mut special_cycles = Vec::new();
         for cycle in self.graph.cycles() {
@@ -71,7 +69,7 @@ impl PropagationGraph {
 
     /// Returns the sequence of rule applications for a given cycle
     /// TODO: handle multi-edges and so on
-    pub fn edges_from_cycle(&self, cycle: &Vec<NodeIndex>) -> Vec<(usize, bool)> {
+    /*pub fn edges_from_cycle(&self, cycle: &Vec<NodeIndex>) -> Vec<(usize, bool)> {
         let mut cycle_edges = Vec::new();
         let size = cycle.len();
         for c_i in 0..size {
@@ -88,7 +86,7 @@ impl PropagationGraph {
             }
         }
         cycle_edges
-    }
+    }*/
 
     /// Gets the set of all nodes that are positions of the same predicate
     pub fn same_predicate(&self, node: NodeIndex) -> HashSet<NodeIndex> {
@@ -125,7 +123,12 @@ impl PropagationGraph {
                 let next_node: NodeIndex = cycle[c_j];
                 self.graph
                     .edges_connecting(*current_node, next_node)
-                    .any(|edge| self.graph.edge_weight(edge.id()).expect("msg").1)
+                    .any(|edge| {
+                        self.graph
+                            .edge_weight(edge.id())
+                            .expect("edge weight should exist")
+                            .1
+                    })
             }) {
                 return false;
             }
@@ -134,42 +137,21 @@ impl PropagationGraph {
     }
 
     /// Returns the all cycles of the rule propagation graph with special cycles
-    pub fn all_special_rules_cycles(&self) -> Vec<Vec<usize>> {
-        let mut special_cycles = Vec::new();
+    pub fn all_rule_cycles(&self) -> Vec<Vec<usize>> {
+        let mut cycles = Vec::new();
         let rule_graph = self.rule_graph_from_propagation_graph();
         for cycle in rule_graph.cycles() {
-            let size = cycle.len();
-
-            if cycle.iter().enumerate().any(|(c_i, current_node)| {
-                let c_j = (c_i + 1) % size;
-                let next_node: NodeIndex = cycle[c_j];
-                if let Some(edge_index) = rule_graph.find_edge(*current_node, next_node) {
-                    *rule_graph.edge_weight(edge_index).expect("msg")
-                } else {
-                    false
-                }
-            }) {
-                let rule_cycle = cycle
-                    .iter()
-                    .map(|node_index| {
-                        *rule_graph
-                            .node_weight(*node_index)
-                            .expect("There should be a node weight")
-                    })
-                    .collect();
-                special_cycles.push(rule_cycle);
-            }
+            let rule_cycle = cycle
+                .iter()
+                .map(|node_index| {
+                    *rule_graph
+                        .node_weight(*node_index)
+                        .expect("There should be a node weight")
+                })
+                .collect();
+            cycles.push(rule_cycle);
         }
-        special_cycles
-    }
-
-    pub fn cycles_without_predicates(
-        &self,
-        rule_graph: Graph<usize, bool>,
-        excluded_predicates: &Vec<Tag>,
-        program: &NormalizedProgram,
-    ) -> Vec<Vec<usize>> {
-        todo!();
+        cycles
     }
 
     /// Builds a rule dependency graph from the propagation graph.
@@ -271,6 +253,7 @@ impl PropagationGraph {
                                     graph.add_edge(*node_body, *node_head, (rule_index, false));
                                 }
                                 //TODO: check if the critical var is actually bound by an edb expression, then it shouldn't be marked
+                                //TODO: actually only if not in body atom
                                 for op in rule.operations() {
                                     if PropagationGraph::critical_operation(op) {
                                         if op.variables().contains(var_h)
