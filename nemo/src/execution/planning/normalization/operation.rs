@@ -114,31 +114,36 @@ impl Operation {
     }
 
     /// Check if two operations are equivalent up to renaming
-    pub fn equivalent_up_to_var_renaming(&self, other: &Operation) -> bool {
-        if let Self::Primitive(prim1) = self
-            && let Self::Primitive(prim2) = other
-        {
-            if prim1.is_ground() && prim2.is_ground() {
-                return prim1 == prim2;
-            } else if prim1.is_universal() && prim2.is_universal() {
-                return true;
-            } else {
-                return false;
+    pub fn equivalent_up_to_renaming(&self, operation: &Operation) -> bool {
+        match (self, operation) {
+            (Operation::Primitive(p1), Operation::Primitive(p2)) => match (p1, p2) {
+                (Primitive::Variable(_), Primitive::Variable(_)) => true,
+                (Primitive::Ground(g1), Primitive::Ground(g2)) => g1 == g2,
+                _ => false,
+            },
+            (
+                Operation::Opreation {
+                    kind: k1,
+                    subterms: s1,
+                },
+                Operation::Opreation {
+                    kind: k2,
+                    subterms: s2,
+                },
+            ) => {
+                let left_self = s1.first().expect("invalid program component");
+                let right_self = s1.get(1).expect("invalid program component");
+                let left_other = s2.first().expect("invalid program component");
+                let right_other = s2.get(1).expect("invalid program component");
+                if k1 == k2 {
+                    left_self.equivalent_up_to_renaming(left_other)
+                        && right_self.equivalent_up_to_renaming(right_other)
+                } else {
+                    false
+                }
             }
+            _ => false,
         }
-        if let Self::Opreation { kind, subterms } = self {
-            let kind_self = kind;
-            let left_self = subterms.first().expect("invalid program component");
-            let right_self = subterms.get(1).expect("invalid program component");
-            if let Self::Opreation { kind, subterms } = other {
-                let left_other = subterms.first().expect("invalid program component");
-                let right_other = subterms.get(1).expect("invalid program component");
-                return kind_self == kind
-                    && left_self.equivalent_up_to_var_renaming(left_other)
-                    && right_self.equivalent_up_to_var_renaming(right_other);
-            }
-        };
-        false
     }
 
     /// Return an iterator over all [AnyDataValue]s within this operation.

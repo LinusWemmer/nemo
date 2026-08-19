@@ -1,24 +1,23 @@
 //! Gernerates the RuleVerifier of a program
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::execution::planning::{
     normalization::{
-        atom::ground::GroundAtom, global_annotation::NormalizedGlobalAnnotation,
-        program::NormalizedProgram, rule::NormalizedRule,
+        atom::ground::GroundAtom, operation::Operation, program::NormalizedProgram,
+        rule::NormalizedRule,
     },
     verification::rule_verification::{
-        filters::Filter, z3_goal::VerificationGoal, z3_restriction::Restriction,
-        z3_translation::RuleTranslator,
+        filters::Filter, z3_restriction::Restriction, z3_translation::RuleTranslator,
     },
 };
 
 use crate::rule_model::components::{tag::Tag, term::primitive::variable::Variable};
 
+use z3::Solver;
 use z3::{
-    self, FuncDecl, Sort,
-    ast::{Ast, Bool, Int, exists_const},
+    self,
+    ast::{Bool, Int},
 };
-use z3::{Goal, Solver, Tactic};
 
 pub mod filters;
 pub mod z3_goal;
@@ -31,8 +30,6 @@ pub mod z3_translation;
 pub struct RuleVerifier {
     fresh_var_counter: usize,
     predicate_restrictions: HashMap<Tag, Restriction>,
-    /// Arguments that are used in the verification
-    verification_goals: HashMap<Tag, VerificationGoal>,
     filter_predicates: Vec<Filter>,
 }
 
@@ -42,7 +39,6 @@ impl RuleVerifier {
         Self {
             fresh_var_counter: 0,
             predicate_restrictions: HashMap::new(),
-            verification_goals: HashMap::new(),
             filter_predicates: Vec::new(),
         }
     }
@@ -51,11 +47,6 @@ impl RuleVerifier {
     pub fn get_fresh_var(&mut self) -> String {
         self.fresh_var_counter += 1;
         format!("V{}", self.fresh_var_counter)
-    }
-
-    /// Returns the verification goals
-    pub fn verification_goals(&self) -> &HashMap<Tag, VerificationGoal> {
-        &self.verification_goals
     }
 
     /// Returns the predicate restrictions
@@ -77,16 +68,31 @@ impl RuleVerifier {
 
     /// Gathers all filter expressions in the program
     pub fn gather_filters(&mut self, program: &NormalizedProgram) {
-        let mut filters = Vec::new();
+        let mut filters: Vec<Operation> = Vec::new();
         for rule in program.rules() {
             let rule_filters = rule.operations().iter().filter(|b| b.is_simple_filter());
-            filters.extend(rule_filters);
+            for filter in rule_filters {
+                if !filters
+                    .iter()
+                    .any(|f: &Operation| f.equivalent_up_to_renaming(filter))
+                {
+                    filters.push(filter.clone())
+                }
+            }
         }
         for annotation in program.global_annotations() {
             let annotation_filters = annotation.body().iter().filter(|b| b.is_simple_filter());
-            filters.extend(annotation_filters);
+            for filter in annotation_filters {
+                if !filters
+                    .iter()
+                    .any(|f: &Operation| f.equivalent_up_to_renaming(filter))
+                {
+                    filters.push(filter.clone())
+                }
+            }
         }
-        self.filter_predicates = filters.iter().map(|f| Filter::new(f)).collect();
+        //TODO: check filters for equivalence and so on
+        self.filter_predicates = filters.iter().map(|f| Filter::new(f.clone())).collect();
     }
 
     /// Returns the restrictions placed on the body predicates
@@ -106,96 +112,6 @@ impl RuleVerifier {
                     })
             })
             .collect()
-    }
-
-    /// Add predicate restrictions from input annotation
-    /// #Panics
-    ///  * panics when there are two input annotations for the same predicate
-    /*pub fn add_restriction_from_input_annotation(&mut self, annotation: &NormalizedInputAnnotation) {
-        if let Some(_) = self.predicate_restrictions.insert(
-            annotation.head().predicate(),
-            Restriction::new_from_annotation(annotation),
-        ) {
-            panic!("Only one input annotation should be used per predicate")
-        }
-    }*/
-
-    /// Add verification goal from output predicate
-    pub fn add_output_verification_goal(&mut self, annotation: &NormalizedGlobalAnnotation) {
-        let goal = VerificationGoal::new_from_annotation(annotation);
-        self.verification_goals
-            .insert(annotation.head().predicate(), goal);
-    }
-
-    /// Propagates head goals to body, logical and them, sort of like weakest precondition
-    /// Returns all predicates for that new goals were generated
-    pub fn backward_prop_goals(&mut self, predicate: &Tag, rule: &NormalizedRule) -> HashSet<Tag> {
-        if let Some(head_verification_goal) = self.verification_goals.get(predicate) {
-            let translator = RuleTranslator::new();
-            let tactic_qe = Tactic::new("qe");
-
-            let var_cache = RuleVerifier::create_var_cache(rule);
-
-            let mut body_operations: Vec<Bool> = rule
-                .operations()
-                .iter()
-                .map(|b| {
-                    translator
-                        .translate_operation(b, &var_cache)
-                        .as_bool()
-                        .expect("Top level operations should have Sort Bool")
-                })
-                .collect();
-
-            let head_goal =
-                Bool::and(&head_verification_goal.goal_from_head_atom(&rule.head()[0], &var_cache))
-                    .not();
-            // TODO: maybe with implication instead of conjuncition
-            body_operations.push(head_goal);
-
-            let mut added_goals = HashSet::new();
-            // Over approximation by eliminating variables ( eg. x= y +z, x>0, if y and z are in different predicates, information is lost)
-            // as we only keep goals on a per predicate basis, sort of weakest precondition
-            for body_atom in rule.positive() {
-                let goal = Goal::new(false, false, false);
-                let atom_vars_set: HashSet<&Variable> = body_atom.terms().collect();
-                let rule_vars: HashSet<&Variable> = rule.variables().collect();
-                let args: Vec<&dyn Ast> = rule_vars
-                    .difference(&atom_vars_set)
-                    .map(|v| var_cache.get(v).expect("variable should be registered"))
-                    .map(|v| -> &dyn Ast { v })
-                    .collect();
-                goal.assert(&exists_const(&args, &[], &Bool::and(&body_operations)));
-                let result = tactic_qe
-                    .apply(&goal, None)
-                    .expect("qe tactic failed")
-                    .list_subgoals()
-                    .collect::<Vec<Goal>>();
-                if let Some(goal) = result.first() {
-                    let filters = goal.get_formulas();
-                    if !filters.is_empty() {
-                        // Note: might yield vacuous statements from guards in rule, i.e. goals that would mean the rule doesn't fire
-                        let new_goal: Bool;
-                        if filters.len() == 1 {
-                            new_goal = filters.first().expect("").not();
-                        } else {
-                            new_goal = Bool::and(&filters).not();
-                        }
-                        self.verification_goals
-                            .entry(body_atom.predicate())
-                            .and_modify(|g| g.add_propagated_goal(body_atom, &var_cache, &new_goal))
-                            .or_insert(VerificationGoal::new_from_propagation(
-                                body_atom, &var_cache, &new_goal,
-                            ));
-                        added_goals.insert(body_atom.predicate());
-                    }
-
-                    // add to z3_goal from prop
-                }
-            }
-            return added_goals;
-        }
-        HashSet::new()
     }
 
     /// Verifies a whether a rule satisfies it's annotations
@@ -274,113 +190,6 @@ impl RuleVerifier {
         }
     }
 
-    /// Checks whether the goal has been proven at least once and never been refuted
-    pub fn check_goal_state(&self, predicate: &Tag) -> bool {
-        if let Some(goal) = self.verification_goals.get(predicate) {
-            return goal.is_proven();
-        }
-        true
-    }
-
-    /// Propagates filters atoms from rule head to body, returns true if new info was gained
-    pub fn verify_with_goal_propagation(
-        &mut self,
-        program: &NormalizedProgram,
-        rule: &NormalizedRule,
-    ) -> bool {
-        let solver = Solver::new();
-
-        let bool_sort = Sort::bool();
-        let int_sort = Sort::int();
-        // Register all predicates of the rule
-        let mut predicate_to_z3_fun: HashMap<Tag, FuncDecl> = HashMap::new();
-        for (tag, arity) in rule.predicates() {
-            let args_sort = vec![&int_sort; arity];
-            let pred = FuncDecl::new(tag.name(), &args_sort, &bool_sort);
-            predicate_to_z3_fun.insert(tag, pred);
-        }
-        let var_cache = RuleVerifier::create_var_cache(rule);
-
-        let translator = RuleTranslator::new_with_predicates(predicate_to_z3_fun);
-
-        // Translate rule body
-        let (body_operations, body_annotations) =
-            translator.translate_rule(rule, &var_cache, program);
-        for term in body_operations {
-            solver.assert(term);
-        }
-
-        for term in body_annotations {
-            solver.assert(term);
-        }
-
-        let proven_body_goals = rule
-            .positive()
-            .iter()
-            .filter_map(|b| {
-                self.verification_goals
-                    .get(&b.predicate())
-                    .and_then(|g| match g.is_proven() {
-                        true => Some(g.goal_from_body_atom(&b, &var_cache)),
-                        false => None,
-                    })
-            })
-            .flatten();
-
-        for g in proven_body_goals {
-            solver.assert(&g);
-        }
-
-        let mut delta = false;
-        // TODO: check if rule could fire before checking, otherwise goal gets set to true without verification
-        let head = &rule.head()[0];
-        if let Some(verification_goal) = self.verification_goals.get_mut(&head.predicate()) {
-            if !verification_goal.is_refuted() {
-                solver.push();
-                let proof_goal = verification_goal.goal_from_head_atom(&head, &var_cache);
-                solver.assert(&Bool::and(&proof_goal).not());
-                match solver.check() {
-                    z3::SatResult::Unsat => delta = verification_goal.goal_proven() || delta,
-                    z3::SatResult::Unknown => println!("Could not validate (unknown)"),
-                    z3::SatResult::Sat => delta = verification_goal.goal_refuted() || delta,
-                }
-                solver.pop(1);
-            }
-        }
-
-        // check all annotations
-        for head_atom_assertion in program.predicate_to_global_annotation(&head.predicate()) {
-            solver.push();
-            let head_assertion =
-                translator.translate_head_assertion(head_atom_assertion, head, &var_cache);
-            solver.assert(&head_assertion.not());
-            match solver.check() {
-                z3::SatResult::Unsat => println!("Validated: spec for {head_atom_assertion} holds"),
-                z3::SatResult::Unknown => println!("Could not validate (unknown)"),
-                z3::SatResult::Sat => {
-                    let model = solver.get_model().expect("Sat model should exist");
-                    let var_interpretation: String = head
-                        .variables()
-                        .map(|v| {
-                            let inter = model
-                                .get_const_interp(var_cache.get(v).expect("Var should be in cache"))
-                                .expect("Counterexample should exist for violation");
-                            format!("{} : {}", v, inter)
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    println!(
-                        "Rule {} might lead to violation of {} with var assigment {}, ",
-                        rule, head_atom_assertion, var_interpretation
-                    );
-                }
-            }
-            solver.pop(1);
-        }
-
-        delta
-    }
-
     /// Propagates filter expressions through the program
     pub fn forward_propagation_alt(
         &mut self,
@@ -412,6 +221,7 @@ impl RuleVerifier {
 
         let mut head_filters: Vec<Bool> = Vec::new();
         for filter in &self.filter_predicates {
+            //TODO: check already here for doubled filters
             for term in head.terms() {
                 solver.push();
                 let filter_head = filter.get_filter(&term, &var_cache);
@@ -433,6 +243,7 @@ impl RuleVerifier {
                         delta || res.add_restriction_from_propagation(head, &var_cache, &head_res);
                 })
                 .or_insert_with(|| {
+                    //TODO: somehow fix the stuff wiht entailment
                     delta = true;
                     Restriction::new_from_propagation(head, &var_cache, &head_res)
                 });
