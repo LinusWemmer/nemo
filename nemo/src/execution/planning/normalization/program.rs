@@ -14,7 +14,6 @@ use crate::{
             atom::ground::GroundAtom, export::ExportInstruction,
             global_annotation::NormalizedGlobalAnnotation, import::ImportInstruction,
             rule::NormalizedRule, termination_annotation::NormalizedTerminationAnnotation,
-            type_annotation::NormalizedTypeAnnotation,
         },
     },
     rule_model::{
@@ -40,8 +39,6 @@ pub struct NormalizedProgram {
     global_annotations: Vec<NormalizedGlobalAnnotation>,
     /// Input Annotations
     termination_annotations: Vec<NormalizedTerminationAnnotation>,
-    /// Type Annotations
-    type_annotations: Vec<NormalizedTypeAnnotation>,
 
     /// Predicate arities
     predicate_arities: HashMap<Tag, usize>,
@@ -129,14 +126,16 @@ impl NormalizedProgram {
         &self.facts
     }
 
+    /// Returns true if any annotations are included in the program
+    pub fn is_annotated(&self) -> bool {
+        let len1 = self.global_annotations.len();
+        let len2 = self.termination_annotations.len();
+        !((len1 == 0) && (len2 == 0))
+    }
+
     /// Return a list of the global annotations of this program
     pub fn global_annotations(&self) -> &Vec<NormalizedGlobalAnnotation> {
         &self.global_annotations
-    }
-
-    /// Return a list of all type annotation of this program
-    pub fn type_annotations(&self) -> &Vec<NormalizedTypeAnnotation> {
-        &self.type_annotations
     }
 
     /// Return a list of the input annotations of this program
@@ -173,14 +172,6 @@ impl NormalizedProgram {
             .any(|a| &a.head().predicate() == predicate)
     }
 
-    /// Return all global annotations for the given predicate
-    pub fn predicate_to_type_annotation(&self, predicate: &Tag) -> Vec<&NormalizedTypeAnnotation> {
-        self.type_annotations
-            .iter()
-            .filter(|annotation| &annotation.predicate() == predicate)
-            .collect()
-    }
-
     /// Add a global annotation to the normalized program
     pub fn add_global_annotation(&mut self, annotation: NormalizedGlobalAnnotation) {
         self.global_annotations.push(annotation)
@@ -189,11 +180,6 @@ impl NormalizedProgram {
     /// Add an input annotation to the normalized program
     pub fn add_termination_annotation(&mut self, annotation: NormalizedTerminationAnnotation) {
         self.termination_annotations.push(annotation)
-    }
-
-    /// Add a type annotation to the normalized program
-    pub fn add_type_annotation(&mut self, annotation: NormalizedTypeAnnotation) {
-        self.type_annotations.push(annotation)
     }
 
     /// Return a list of output predicates contained in this program.
@@ -344,13 +330,6 @@ impl NormalizedProgram {
             let normalized_annotation =
                 NormalizedTerminationAnnotation::normalize_termination_annotation(annotation);
             result.add_termination_annotation(normalized_annotation);
-        }
-
-        // Handle type annotations
-        for annotation in program.type_annotations() {
-            let normalized_annotation =
-                NormalizedTypeAnnotation::normalize_type_annotation(annotation);
-            result.add_type_annotation(normalized_annotation);
         }
 
         // Handle imports

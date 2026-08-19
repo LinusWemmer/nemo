@@ -9,4 +9,3 @@ pub mod number;
 pub mod rdf_literal;
 pub mod string;
 pub mod variable;
-pub mod types;

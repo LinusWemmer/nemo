@@ -113,46 +113,6 @@ pub mod termination_annotation {
     pub const OPEN_DECREASE: &str = "#decreases";
 }
 
-pub mod type_annotation {
-    //! This module contains syntax definitions for type annotations/declarations.
-
-    /// opening token type assertion:
-    pub const OPEN_TYPE: &str = "#type";
-
-    /// Mark as int:
-    pub const TYPE_INDICATOR_INT: &str = "int";
-    /// Mark as float:
-    pub const TYPE_INDICATOR_FLOAT: &str = "float";
-    /// Mark as string:
-    pub const TYPE_INDICATOR_STRING: &str = "str";
-    /// Mark as language tagged string:
-    pub const TYPE_INDICATOR_LANGUAGE_TAGGED_STRING: &str = "languageTaggedString";
-    /// Mark as IRI:
-    pub const TYPE_INDICATOR_IRI: &str = "iri";
-    /// Mark as double:
-    pub const TYPE_INDICATOR_DOUBLE: &str = "double";
-    /// Mark as unsigned long:
-    pub const TYPE_INDICATOR_UNSIGNED_LONG: &str = "unsignedLong";
-    /// Mark as non-negative long:
-    pub const TYPE_INDICATOR_NON_NEGATIVE_LONG: &str = "nonNegativeLong";
-    /// Mark as unsigned int:
-    pub const TYPE_INDICATOR_UNSIGNED_INT: &str = "unsignedInt";
-    /// Mark as non-negative int:
-    pub const TYPE_INDICATOR_NON_NEGATIVE_INT: &str = "nonNegativeInt";
-    /// Mark as long:
-    pub const TYPE_INDICATOR_LONG: &str = "long";
-    /// Mark as tuple:
-    pub const TYPE_INDICATOR_TUPLE: &str = "tuple";
-    /// Mark as map:
-    pub const TYPE_INDICATOR_MAP: &str = "map";
-    /// Mark as boolean:
-    pub const TYPE_INDICATOR_BOOLEAN: &str = "boolean";
-    /// Mark as null:
-    pub const TYPE_INDICATOR_NULL: &str = "null";
-    /// Mark as other:
-    pub const TYPE_INDICATOR_OTHER: &str = "other";
-}
-
 pub mod fact {
     //! This module contains the syntax definitions for facts.
 }

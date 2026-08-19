@@ -16,7 +16,6 @@ pub mod symbols;
 pub mod tag;
 pub mod term;
 pub mod termination_annotation;
-pub mod type_annotation;
 use std::{
     any::Any,
     fmt::{Debug, Display},
@@ -128,9 +127,6 @@ pub enum ProgramComponentKind {
     ///Rule Annotation
     #[assoc(name = "rule annotation")]
     RuleAnnotation,
-    ///Type Annotation
-    #[assoc(name = "type annotation")]
-    TypeAnnotation,
     /// Import
     #[assoc(name = "import")]
     Import,

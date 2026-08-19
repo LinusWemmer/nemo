@@ -13,7 +13,6 @@ pub mod statement;
 pub mod tag;
 pub mod termination_annotation;
 pub mod token;
-pub mod type_annotation;
 
 use std::{fmt::Debug, ops::Range};
 

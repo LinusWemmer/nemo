@@ -7,7 +7,7 @@ use crate::rule_model::{
         ComponentBehavior, ComponentIdentity, ComponentSource, IterableComponent, ProgramComponent,
         ProgramComponentKind, component_iterator, component_iterator_mut,
         global_annotation::GlobalAnnotation, rule::Rule, statement::Statement,
-        termination_annotation::TerminationAnnotation, type_annotation::TypeAnnotation,
+        termination_annotation::TerminationAnnotation,
     },
     error::ValidationReport,
     origin::Origin,
@@ -57,14 +57,6 @@ impl Program {
             Statement::TerminationAnnotation(termination_annotation) => {
                 Some(termination_annotation)
             }
-            _ => None,
-        })
-    }
-
-    /// Returns the type annotations
-    pub fn type_annotations(&self) -> impl Iterator<Item = &TypeAnnotation> {
-        self.statements().filter_map(|statement| match statement {
-            Statement::TypeAnnotation(type_annotation) => Some(type_annotation),
             _ => None,
         })
     }

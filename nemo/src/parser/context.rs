@@ -181,9 +181,6 @@ pub enum ParserContext {
     /// Input Annotation
     #[assoc(name = "termination annotation")]
     TerminationAnnotation,
-    /// Type Annotation
-    #[assoc(name = "type annotation")]
-    TypeAnnotation,
 }
 
 impl ParserContext {

@@ -10,4 +10,3 @@ pub mod operation;
 pub mod program;
 pub mod rule;
 pub mod termination_annotation;
-pub mod type_annotation;

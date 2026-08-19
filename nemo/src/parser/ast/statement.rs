@@ -24,7 +24,6 @@ use super::{
     rule::Rule,
     termination_annotation::TerminationAnnotation,
     token::Token,
-    type_annotation::TypeAnnotation,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -43,8 +42,6 @@ pub enum StatementKind<'a> {
     GlobalAnnotation(GlobalAnnotation<'a>),
     /// Termination Annotation
     TerminationAnnotation(TerminationAnnotation<'a>),
-    /// Type Annotation
-    TypeAnnotation(TypeAnnotation<'a>),
 }
 
 impl<'a> StatementKind<'a> {
@@ -56,7 +53,6 @@ impl<'a> StatementKind<'a> {
             StatementKind::Directive(statement) => statement.context(),
             StatementKind::GlobalAnnotation(statement) => statement.context(),
             StatementKind::TerminationAnnotation(statement) => statement.context(),
-            StatementKind::TypeAnnotation(statement) => statement.context(),
             StatementKind::Error(_statement) => ParserContext::Error,
         }
     }
@@ -118,7 +114,6 @@ impl<'a> ProgramAST<'a> for Statement<'a> {
             StatementKind::Directive(statement) => vec![statement],
             StatementKind::GlobalAnnotation(statement) => vec![statement],
             StatementKind::TerminationAnnotation(statement) => vec![statement],
-            StatementKind::TypeAnnotation(statement) => vec![statement],
             StatementKind::Error(_) => vec![],
         }
     }

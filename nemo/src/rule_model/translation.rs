@@ -10,7 +10,6 @@ pub(crate) mod literal;
 pub(crate) mod rule;
 mod term;
 pub(crate) mod termination_annotation;
-pub(crate) mod type_annotation;
 
 use std::{
     collections::HashMap,
@@ -37,10 +36,7 @@ use crate::{
 };
 
 use super::{
-    components::{
-        fact::Fact, global_annotation::GlobalAnnotation, rule::Rule, term::Term,
-        type_annotation::TypeAnnotation,
-    },
+    components::{fact::Fact, global_annotation::GlobalAnnotation, rule::Rule, term::Term},
     error::{TranslationReport, translation_error::TranslationError},
 };
 
@@ -125,13 +121,6 @@ impl ASTProgramTranslation {
                         TerminationAnnotation::build_component(&mut self, termination_annotation)
                     {
                         program.add_termination_annotation(termination_annotation);
-                    }
-                }
-                ast::statement::StatementKind::TypeAnnotation(type_annotation) => {
-                    if let Some(type_annotation) =
-                        TypeAnnotation::build_component(&mut self, type_annotation)
-                    {
-                        program.add_type_annotation(type_annotation);
                     }
                 }
                 ast::statement::StatementKind::Error(_token) => {
