@@ -26,38 +26,6 @@ pub struct Restriction {
 }
 
 impl Restriction {
-    /// Creates a new set of restricitons from Input
-    /*pub fn new_from_annotation(annotation: &NormalizedInputAnnotation) -> Self {
-        let head_vars: Vec<Int> = (0..annotation.head().arity())
-            .map(|n| Int::fresh_const(&format!("V{n}")))
-            .collect();
-
-        let var_cache: HashMap<Variable, Int> = annotation
-            .variables()
-            .enumerate()
-            .map(|(pos, v)| (v.clone(), head_vars[pos].clone()))
-            .collect();
-
-        let translator = RuleTranslator::new();
-        let body: Vec<Bool> = annotation
-            .body()
-            .iter()
-            .map(|op| {
-                translator
-                    .translate_operation(op, &var_cache)
-                    .as_bool()
-                    .expect("Translation should work")
-            })
-            .collect();
-
-        let restriction = Bool::and(&body);
-
-        Self {
-            restriction_head_vars: head_vars,
-            restrictions: vec![restriction],
-        }
-    }*/
-
     /// Creates a new [Restriction] from a propagated formula
     pub fn new_from_propagation(
         head: &HeadAtom,
@@ -107,35 +75,25 @@ impl Restriction {
             .map(|res| res.substitute(&substitution))
             .collect();
 
-        Bool::and(&body_res)
+        Bool::or(&body_res)
     }
 
     /// Checks whether a new restriction actually gives new entailments
+    /// TODO: check whether this actually works, how do we do it
+    ///
     pub fn check_new_entailment(&self, new_restriction: &Bool) -> bool {
         let solver = Solver::new();
-
         solver.assert(Bool::and(&self.restrictions).not());
         solver.assert(new_restriction);
+
+        println!("checking entailment:");
+        println!("{}", solver.to_smt2());
 
         match solver.check() {
             z3::SatResult::Unsat => false,
             z3::SatResult::Unknown => false,
             z3::SatResult::Sat => true,
         }
-    }
-
-    /// Checks whether the given operation is actually a valid restriction (i.e. some form of y<c or x<y or similar)
-    pub fn is_filter_operation(restriction: &Bool) -> bool {
-        let children = restriction.children();
-        let left = children.first();
-        let right = children.get(1);
-        if restriction.is_app()
-            && let Some(t1) = left
-            && let Some(t2) = right
-        {
-            return (t1.is_const() || t1.is_app()) && (t2.is_const() || t2.is_app());
-        }
-        false
     }
 
     /// Adds a restriction to the set of restrictions, returns true if something changes, false otherwise
