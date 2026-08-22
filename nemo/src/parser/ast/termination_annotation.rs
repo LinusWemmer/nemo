@@ -10,7 +10,7 @@ use nom::{
 use crate::parser::{
     ParserResult,
     ast::{
-        expression::complex::{arithmetic::Arithmetic, atom::Atom},
+        expression::{Expression, complex::atom::Atom},
         token::TokenKind,
     },
     context::{ParserContext, context},
@@ -38,13 +38,13 @@ pub struct TerminationAnnotation<'a> {
     predicate: Atom<'a>,
     /// In which direction does the change happen
     direction: TerminationDirection,
-    /// [Sequence] containing variable body
-    body: Arithmetic<'a>,
+    /// Function for the annotation
+    body: Expression<'a>,
 }
 
 impl<'a> TerminationAnnotation<'a> {
-    /// Return the body of the global annotation
-    pub fn body(&self) -> &Arithmetic<'a> {
+    /// Return the body of the annotation
+    pub fn body(&self) -> &Expression<'a> {
         &self.body
     }
 
@@ -88,7 +88,7 @@ impl<'a> ProgramAST<'a> for TerminationAnnotation<'a> {
                     Atom::parse,
                 )),
                 tuple((WSoC::parse, Token::annotation_seperator, WSoC::parse)),
-                Arithmetic::parse,
+                Expression::parse,
             ),
         )(input)
         .map(|(rest, ((token, _, predicate), body))| {

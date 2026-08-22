@@ -111,10 +111,12 @@ impl<Strategy: RuleSelectionStrategy> ExecutionEngine<Strategy> {
         let normalized_program = NormalizedProgram::normalize_program(&program);
 
         // Try to verify the program
-        log::info!("Analyzing ... ");
-        let mut analyzer = AnnotationAnalyzer::new(&normalized_program);
-        analyzer.verify_with_forward_propagation();
-        log::info!("Analyzing Done ... ");
+        if normalized_program.is_annotated() {
+            log::info!("Analyzing ... ");
+            let mut analyzer = AnnotationAnalyzer::new(&normalized_program);
+            analyzer.verify_with_forward_propagation();
+            log::info!("Analyzing Done ... ");
+        }
 
         let mut table_manager = TableManager::new();
         Self::register_all_predicates(&mut table_manager, &normalized_program);

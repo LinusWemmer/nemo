@@ -41,7 +41,9 @@ impl NormalizedGlobalAnnotation {
         let (head, new_operations) = BodyAtom::normalize_atom(&mut generator, atom);
 
         if !new_operations.is_empty() {
-            panic!("Operations and aggregations in annotation head aren't supported");
+            panic!(
+                "Invalid annotation: operations used in annotation atom, which is not supported"
+            );
         }
         let body = annotation
             .body()

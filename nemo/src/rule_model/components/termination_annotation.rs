@@ -3,7 +3,6 @@
 use std::{collections::HashSet, fmt::Display, hash::Hash};
 
 use crate::rule_model::{
-    components::term::operation::Operation,
     error::{ValidationReport, validation_error::ValidationError},
     origin::Origin,
     pipeline::id::ProgramComponentId,
@@ -37,12 +36,12 @@ pub struct TerminationAnnotation {
     /// direction of the termination
     direction: TerminationDirection,
     /// body of the annotation
-    body: Operation,
+    body: Term,
 }
 
 impl TerminationAnnotation {
     /// Create a new [TerminationAnnotation].
-    pub fn new(predicate: Atom, body: Operation, direction: TerminationDirection) -> Self {
+    pub fn new(predicate: Atom, body: Term, direction: TerminationDirection) -> Self {
         Self {
             origin: Origin::Created,
             id: ProgramComponentId::default(),
@@ -58,7 +57,7 @@ impl TerminationAnnotation {
     }
 
     /// Return the body of the operations
-    pub fn body(&self) -> &Operation {
+    pub fn body(&self) -> &Term {
         &self.body
     }
 
@@ -68,7 +67,7 @@ impl TerminationAnnotation {
     }
 
     /// Return a mutable reference to the operations as mut
-    pub fn body_mut(&mut self) -> &mut Operation {
+    pub fn body_mut(&mut self) -> &mut Term {
         &mut self.body
     }
 
@@ -89,15 +88,10 @@ impl ComponentBehavior for TerminationAnnotation {
     }
 
     /// Validate the termination annotation, the following should hold:
-    ///     * All variables in the body occur in the predicate/predicate
-    ///     * All body are either eq or unequal at highest level
-    ///     * TODO: validate that assert atoms are only edb/facts, while the ensure need at least one non fact
-    ///     => How would I do this?
-    /// TODO: change type to allow only infix ops, but all of them
+    ///     * All variables in the body occur in the atom
     fn validate(&self) -> Result<(), ValidationReport> {
         let mut report = ValidationReport::default();
 
-        //TODO: validate children
         for child in self.children() {
             report.merge(child.validate());
         }
@@ -112,6 +106,7 @@ impl ComponentBehavior for TerminationAnnotation {
         }
 
         // Check if all body are equality or unequality TODO: check for geq, gt, leq, lt
+        // TODO: check if body atom contains numeric terms ?
 
         report.result()
     }

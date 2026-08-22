@@ -74,6 +74,7 @@ impl EdbAnalyzer {
                         })
                     }) {
                         delta = rejected_positions.insert((head.predicate(), head_pos)) || delta;
+                        edb_positions.remove(&(head.predicate(), head_pos));
                     }
                     // Variable occurs in critical operation
                     else if rule.operations().iter().any(|op| {
@@ -81,6 +82,7 @@ impl EdbAnalyzer {
                             .any(|v_op| (v_op == var_h) && EdbAnalyzer::critical_operation(&op))
                     }) {
                         delta = rejected_positions.insert((head.predicate(), head_pos)) || delta;
+                        edb_positions.remove(&(head.predicate(), head_pos));
                     }
                 }
 
@@ -131,6 +133,7 @@ impl EdbAnalyzer {
                     );
                 }
             }
+            delta = true;
         }
         Self { edb_positions }
     }
@@ -147,8 +150,9 @@ impl EdbAnalyzer {
                 && let Operation::Primitive(_) = right
             {
                 return false;
+            } else {
+                return true;
             }
-            true
         } else {
             false
         }

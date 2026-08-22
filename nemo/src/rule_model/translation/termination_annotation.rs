@@ -5,7 +5,10 @@ use crate::{
     rule_model::{
         self,
         components::{
-            atom::Atom, tag::Tag, term::Term, termination_annotation::TerminationAnnotation,
+            atom::Atom,
+            tag::Tag,
+            term::{Term, primitive::variable::Variable},
+            termination_annotation::TerminationAnnotation,
         },
         origin::Origin,
         translation::complex::arithmetic::ArithmeticOperation,
@@ -40,9 +43,17 @@ impl TranslationComponent for TerminationAnnotation {
         };
 
         // Build the body:
-        let body =
-            ArithmeticOperation::build_component(translation, annotation.body())?.into_inner();
-
+        let body = match annotation.body() {
+            ast::expression::Expression::Arithmetic(arithmetic) => Term::from(
+                ArithmeticOperation::build_component(translation, arithmetic)?.into_inner(),
+            ),
+            ast::expression::Expression::Variable(variable) => {
+                Term::from(Variable::build_component(translation, variable)?)
+            }
+            _ => panic!(
+                "Only arithmetic expressions and variables are allowed in termination annotation"
+            ),
+        };
         Some(Origin::ast(
             TerminationAnnotation::new(predicate, body, direction),
             annotation,

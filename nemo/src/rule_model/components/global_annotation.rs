@@ -78,15 +78,10 @@ impl ComponentBehavior for GlobalAnnotation {
     }
 
     /// Validate the global annotation, the following should hold:
-    ///     * All variables in the body occur in the predicate/predicate
-    ///     * All body are either eq or unequal at highest level
-    ///     * TODO: validate that assert atoms are only edb/facts, while the ensure need at least one non fact
-    ///     => How would I do this?
-    /// TODO: change type to allow only infix ops, but all of them
     fn validate(&self) -> Result<(), ValidationReport> {
         let mut report = ValidationReport::default();
 
-        //TODO: validate children
+        //validate children
         for child in self.children() {
             report.merge(child.validate());
         }
@@ -103,9 +98,17 @@ impl ComponentBehavior for GlobalAnnotation {
         // Check if all body are equality or unequality TODO: check for geq, gt, leq, lt
         for operation in self.body() {
             let kind = operation.operation_kind();
-            if !(kind == OperationKind::Equal || kind == OperationKind::Unequals) {
-                report.add(self, ValidationError::UnsoppertedAnnotationRestrictions);
-                return report.result();
+            match kind {
+                OperationKind::Equal
+                | OperationKind::Unequals
+                | OperationKind::NumericGreaterthan
+                | OperationKind::NumericGreaterthaneq
+                | OperationKind::NumericLessthan
+                | OperationKind::NumericLessthaneq => {}
+                _ => {
+                    report.add(self, ValidationError::UnsoppertedAnnotationRestrictions);
+                    return report.result();
+                }
             }
         }
 

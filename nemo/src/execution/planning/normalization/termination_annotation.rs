@@ -57,10 +57,10 @@ impl NormalizedTerminationAnnotation {
 
         if !new_operations.is_empty() {
             panic!(
-                "Operations and Aggregations should not be used in annotation head, same variables in head not supported yet"
+                "Invalid annotation: operations used in annotation atom, which is not supported"
             );
         }
-        let body = Operation::normalize_body_operation(annotation.body());
+        let body = Operation::normalize_body_term(annotation.body());
 
         let direction = match annotation.direction(){
             crate::rule_model::components::termination_annotation::TerminationDirection::Increasing => TerminationDirection::Increasing,

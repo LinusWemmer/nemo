@@ -79,15 +79,10 @@ impl Restriction {
     }
 
     /// Checks whether a new restriction actually gives new entailments
-    /// TODO: check whether this actually works, how do we do it
-    ///
     pub fn check_new_entailment(&self, new_restriction: &Bool) -> bool {
         let solver = Solver::new();
         solver.assert(Bool::and(&self.restrictions).not());
         solver.assert(new_restriction);
-
-        println!("checking entailment:");
-        println!("{}", solver.to_smt2());
 
         match solver.check() {
             z3::SatResult::Unsat => false,

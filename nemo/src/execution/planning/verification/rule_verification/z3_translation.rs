@@ -3,10 +3,7 @@
 use std::collections::HashMap;
 
 use nemo_physical::datavalues::DataValue;
-use z3::{
-    FuncDecl,
-    ast::{Ast, Bool, Dynamic, Int},
-};
+use z3::ast::{Ast, Bool, Dynamic, Int};
 
 use crate::{
     execution::planning::normalization::{
@@ -17,82 +14,21 @@ use crate::{
         rule::NormalizedRule,
         termination_annotation::NormalizedTerminationAnnotation,
     },
-    rule_model::components::{
-        tag::Tag,
-        term::primitive::{Primitive, variable::Variable},
-    },
+    rule_model::components::term::primitive::{Primitive, variable::Variable},
 };
 
 /// Struct for translating rules to a z3 representation for verification
-#[derive(Debug)]
-pub struct RuleTranslator {
-    /// Maps Predicate Tags to z3 function declarations
-    predicate_to_z3_fun: HashMap<Tag, FuncDecl>,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct RuleTranslator {}
 
 impl RuleTranslator {
     /// Creates a new [RuleTranslator]
     pub fn new() -> Self {
-        let predicate_to_z3_fun = HashMap::default();
-        Self {
-            predicate_to_z3_fun,
-        }
-    }
-
-    /// Creates a new rules translator with a map from predicate Tags to z3 functions
-    pub fn new_with_predicates(predicate_to_z3_fun: HashMap<Tag, FuncDecl>) -> Self {
-        Self {
-            predicate_to_z3_fun,
-        }
+        Self {}
     }
 }
 
 impl RuleTranslator {
-    /// Translates a (normalized) body atom according to tau
-    pub fn translate_body_atom(&self, atom: &BodyAtom, var_cache: &HashMap<Variable, Int>) -> Bool {
-        let predicate = self
-            .predicate_to_z3_fun
-            .get(&atom.predicate())
-            .expect("predicate should be registered");
-
-        let mut var_list = Vec::new();
-        for var in atom.terms() {
-            var_list.push(
-                var_cache
-                    .get(var)
-                    .expect("Variable should be registered")
-                    .clone(),
-            );
-        }
-
-        let args: Vec<&dyn Ast> = var_list.iter().map(|v| -> &dyn Ast { v }).collect();
-
-        predicate
-            .apply(&args)
-            .as_bool()
-            .expect("translating body atom went wrong")
-    }
-
-    /// Translates a (normalized) head atom according to tau
-    pub fn translate_head_atom(&self, atom: &HeadAtom, var_cache: &HashMap<Variable, Int>) -> Bool {
-        let predicate = self
-            .predicate_to_z3_fun
-            .get(&atom.predicate())
-            .expect("predicate should be registered");
-
-        let mut term_list = Vec::new();
-        for term in atom.terms() {
-            term_list.push(self.translate_primitive(term, var_cache));
-        }
-
-        let args: Vec<&dyn Ast> = term_list.iter().map(|v| -> &dyn Ast { v }).collect();
-
-        predicate
-            .apply(&args)
-            .as_bool()
-            .expect("translating head atom went wrong")
-    }
-
     /// Translates a primitive into an int for now
     pub fn translate_primitive(&self, prim: &Primitive, var_cache: &HashMap<Variable, Int>) -> Int {
         match prim {
