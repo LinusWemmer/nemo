@@ -221,7 +221,6 @@ impl RuleVerifier {
 
         let mut head_filters: Vec<Bool> = Vec::new();
         for filter in &self.filter_predicates {
-            //TODO: check already here for doubled filters
             for term in head.terms() {
                 solver.push();
                 let filter_head = filter.get_filter(&term, &var_cache);
@@ -240,7 +239,20 @@ impl RuleVerifier {
                 .entry(head.predicate())
                 .and_modify(|res| {
                     delta =
-                        delta || res.add_restriction_from_propagation(head, &var_cache, &head_res);
+                        res.add_restriction_from_propagation(head, &var_cache, &head_res) || delta;
+                })
+                .or_insert_with(|| {
+                    //TODO: somehow fix the stuff wiht entailment
+                    delta = true;
+                    Restriction::new_from_propagation(head, &var_cache, &head_res)
+                });
+        } else {
+            let head_res = Bool::from_bool(true);
+            self.predicate_restrictions
+                .entry(head.predicate())
+                .and_modify(|res| {
+                    delta =
+                        res.add_restriction_from_propagation(head, &var_cache, &head_res) || delta;
                 })
                 .or_insert_with(|| {
                     //TODO: somehow fix the stuff wiht entailment
@@ -251,61 +263,6 @@ impl RuleVerifier {
 
         delta
     }
-
-    /// verifies a rule and propagates restriction from the body to the head
-    /*pub fn forward_propagation(&mut self, program: &NormalizedProgram, rule: &NormalizedRule) {
-        let goal = Goal::new(false, false, false);
-        let tactic_qe = Tactic::new("qe");
-
-        let translator = RuleTranslator::new();
-        let var_cache = RuleVerifier::create_var_cache(rule);
-
-        // Translate rule body
-        let mut (body_operations, body_annotations) = translator.translate_rule(rule, &var_cache, program);
-        let body_restrictions = rule.positive().iter().filter_map(|body_atom| {
-            self.predicate_restrictions
-                .get(&body_atom.predicate())
-                .and_then(|res| Some(res.get_restrictions_for_body(body_atom, &var_cache)))
-        });
-        body_instance.extend(body_restrictions);
-
-        let head = &rule.head()[0];
-
-        let rule_variables: HashSet<&Variable> = rule.variables().collect();
-        let head_variables: HashSet<&Variable> = head.variables().collect();
-        let args: Vec<&dyn Ast> = rule_variables
-            .difference(&head_variables)
-            .map(|v| var_cache.get(v).expect("variable should be registered"))
-            .map(|v| -> &dyn Ast { v })
-            .collect();
-
-        goal.assert(&exists_const(&args, &[], &Bool::and(&body_instance)));
-        let result = tactic_qe
-            .apply(&goal, None)
-            .expect("qe tactic failed")
-            .list_subgoals()
-            .collect::<Vec<Goal>>();
-
-        if let Some(goal) = result.first() {
-            let new_restriction = goal.get_formulas();
-            if !new_restriction.is_empty() {
-                let head_res: Bool;
-                if new_restriction.len() == 1 {
-                    head_res = new_restriction.first().expect("").clone();
-                } else {
-                    head_res = Bool::and(&new_restriction);
-                }
-                self.predicate_restrictions
-                    .entry(head.predicate())
-                    .and_modify(|res| {
-                        res.add_restriction_from_propagation(head, &var_cache, &head_res);
-                    })
-                    .or_insert(Restriction::new_from_propagation(
-                        head, &var_cache, &head_res,
-                    ));
-            }
-        }
-    }*/
 
     /// Verifies a rule like the function verify_rule, but includes possible propagated restrictions from the rule body
     pub fn verify_with_restrictions(

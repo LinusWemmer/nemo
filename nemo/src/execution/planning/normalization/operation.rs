@@ -84,8 +84,6 @@ impl Operation {
     pub fn is_simple_filter(&self) -> bool {
         let filter_exp = {
             |kind: &OperationKind| match kind {
-                OperationKind::Equal => true,
-                OperationKind::Unequals => true,
                 OperationKind::NumericGreaterthaneq => true,
                 OperationKind::NumericGreaterthan => true,
                 OperationKind::NumericLessthaneq => true,

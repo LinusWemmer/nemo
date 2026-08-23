@@ -104,7 +104,7 @@ impl AnnotationAnalyzer {
 
                 for rule_index in &scc {
                     let rule = &self.program.rules()[*rule_index];
-                    delta = delta || verifier.forward_propagation_alt(self.program(), rule);
+                    delta = verifier.forward_propagation_alt(self.program(), rule) || delta;
                 }
             }
         }
