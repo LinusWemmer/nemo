@@ -20,7 +20,6 @@ use z3::{
 };
 
 pub mod filters;
-pub mod z3_goal;
 pub mod z3_restriction;
 pub mod z3_translation;
 
@@ -191,7 +190,7 @@ impl RuleVerifier {
     }
 
     /// Propagates filter expressions through the program
-    pub fn forward_propagation_alt(
+    pub fn forward_propagation(
         &mut self,
         program: &NormalizedProgram,
         rule: &NormalizedRule,

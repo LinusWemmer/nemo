@@ -28,6 +28,7 @@ use crate::{
     error::{Error, ReadingError, report::ProgramReport},
     execution::{
         DefaultExecutionEngine, ExecutionEngine, execution_parameters::ExecutionParameters,
+        verification_parameters::VerificationParameters,
     },
     rule_file::RuleFile,
     rule_model::{
@@ -59,10 +60,13 @@ pub async fn load(file: PathBuf) -> Result<Engine, Error> {
 pub async fn load_string(input: String) -> Result<Engine, Error> {
     let parameters = ExecutionParameters::default();
     let file = RuleFile::new(input, String::default());
+    let verification_parameters = VerificationParameters::default();
 
-    Ok(ExecutionEngine::from_file(file, parameters)
-        .await?
-        .into_object())
+    Ok(
+        ExecutionEngine::from_file(file, parameters, verification_parameters)
+            .await?
+            .into_object(),
+    )
 }
 
 /// Parse a program in the given `input`-string and return a [Program].

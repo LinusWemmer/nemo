@@ -59,7 +59,7 @@ impl AnnotationAnalyzer {
 
     /// Verifies annotations of a program whether they all "support" each other without contradiction
     /// No propagation is done, so most annotations have to be written by user
-    pub fn verify_annotations(&mut self) {
+    pub fn verify_annotations(&mut self, ct: bool) {
         let mut verifier = RuleVerifier::new();
 
         for fact in self.program.facts() {
@@ -83,10 +83,13 @@ impl AnnotationAnalyzer {
         } else {
             println!("Contradiction to annotations found.")
         }
+        if ct {
+            self.check_termination(&verifier);
+        }
     }
 
     /// Verifies and propagates forward any known annotations
-    pub fn verify_with_forward_propagation(&mut self) {
+    pub fn verify_with_forward_propagation(&mut self, ct: bool) {
         let mut verifier = RuleVerifier::new();
         for fact in self.program.facts() {
             verifier.verify_facts(fact, self.program());
@@ -104,7 +107,7 @@ impl AnnotationAnalyzer {
 
                 for rule_index in &scc {
                     let rule = &self.program.rules()[*rule_index];
-                    delta = verifier.forward_propagation_alt(self.program(), rule) || delta;
+                    delta = verifier.forward_propagation(self.program(), rule) || delta;
                 }
             }
         }
@@ -120,7 +123,9 @@ impl AnnotationAnalyzer {
             println!("Contradiction to annotations found.")
         }
 
-        self.check_termination(&verifier);
+        if ct {
+            self.check_termination(&verifier);
+        }
     }
 
     /// Checks whether termination of the program can be verified

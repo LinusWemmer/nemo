@@ -2,27 +2,25 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
+    i64,
 };
 
 use z3::{
     Optimize, Solver,
-    ast::{Ast, Bool, Int, exists_const, forall_const},
+    ast::{Ast, Bool, Int},
 };
 
 use crate::{
     execution::planning::{
         normalization::{
-            program::{self, NormalizedProgram},
+            program::NormalizedProgram,
             rule::NormalizedRule,
             termination_annotation::{NormalizedTerminationAnnotation, TerminationDirection},
         },
         verification::{
             annotation_analysis::propagation_graph::PropagationGraph,
             edb_analysis::EdbAnalyzer,
-            rule_verification::{
-                RuleVerifier, z3_restriction::Restriction, z3_translation::RuleTranslator,
-            },
+            rule_verification::{z3_restriction::Restriction, z3_translation::RuleTranslator},
         },
     },
     rule_model::components::{
@@ -79,8 +77,8 @@ impl TerminationVerifier {
     /// * The expressions used in the unfolded loop in smtlib rep
     /// * The recursive predicate in the start of the cycle
     /// * The recursive vars at the end of the cycle
-    /// TODO: somehow incorporate rule without arithmetic...
     /// TODO: restriction
+    /// TODO: incorporate joins if some predicate appears multiple times in body
     pub fn compose_cycle(
         &self,
         cycle: &Vec<&NormalizedRule>,
@@ -244,8 +242,19 @@ impl TerminationVerifier {
     }
 
     /// Checks whether the cycle has an upper bound
-    pub fn expression_has_upper_bound(&self, composed_cycle: &Vec<Bool>, norm: &Int) -> bool {
+    pub fn expression_has_upper_bound(
+        &self,
+        composed_cycle: &Vec<Bool>,
+        norm: &Int,
+        edb_vars: &HashSet<Int>,
+    ) -> bool {
         let optimize = Optimize::new();
+        let int_max = i64::MAX;
+        let int_min = i64::MIN;
+        for var in edb_vars {
+            optimize.assert(var.lt(int_max));
+            optimize.assert(var.gt(int_min));
+        }
         for term in composed_cycle {
             optimize.assert(term);
         }
@@ -261,8 +270,19 @@ impl TerminationVerifier {
     }
 
     /// Checks whether the cycle has a lower bound
-    pub fn expression_has_lower_bound(&self, composed_cycle: &Vec<Bool>, norm: &Int) -> bool {
+    pub fn expression_has_lower_bound(
+        &self,
+        composed_cycle: &Vec<Bool>,
+        norm: &Int,
+        edb_vars: &HashSet<Int>,
+    ) -> bool {
         let optimize = Optimize::new();
+        let int_max = i64::MAX;
+        let int_min = i64::MIN;
+        for var in edb_vars {
+            optimize.assert(var.lt(int_max));
+            optimize.assert(var.gt(int_min));
+        }
         for term in composed_cycle {
             optimize.assert(term);
         }
@@ -296,10 +316,10 @@ impl TerminationVerifier {
             // Check bound TODO: incorporate bound by rules
             let has_bound = match annotation.direction() {
                 TerminationDirection::Decreasing => {
-                    self.expression_has_lower_bound(&composed_cycle, &cycle_end_norm)
+                    self.expression_has_lower_bound(&composed_cycle, &cycle_end_norm, &edb_vars)
                 }
                 TerminationDirection::Increasing => {
-                    self.expression_has_upper_bound(&composed_cycle, &cycle_end_norm)
+                    self.expression_has_upper_bound(&composed_cycle, &cycle_end_norm, &edb_vars)
                 }
             };
             has_bound

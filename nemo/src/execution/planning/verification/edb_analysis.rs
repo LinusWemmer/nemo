@@ -45,19 +45,6 @@ impl EdbAnalyzer {
         {
             match prim {
                 Primitive::Variable(var_h) => {
-                    /*or b in rule.positive() {
-                        for (body_pos, var_b) in b.terms().enumerate() {
-                            println!("{}", var_b == var_h);
-                            println!("b{}", edb_positions.contains(&(b.predicate(), body_pos)));
-                            if edb_positions.contains(&(b.predicate(), body_pos)) && var_b == var_h
-                            {
-                                delta = edb_positions.insert((head.predicate(), head_pos));
-                                println!("delta");
-                            } else if rejected_positions.contains(&(b.predicate(), body_pos)) {
-                                delta = rejected_positions.insert((head.predicate(), head_pos));
-                            }
-                        }
-                    }*/
                     // Var occurs in body position of edb_position
                     if rule.positive().iter().any(|b| {
                         b.terms().enumerate().any(|(body_pos, var_b)| {
@@ -138,7 +125,7 @@ impl EdbAnalyzer {
         Self { edb_positions }
     }
 
-    /// Returns true if the operation creates a new value for the variable
+    /// Returns true if the operation potentially creates a new value for the variable
     pub fn critical_operation(op: &Operation) -> bool {
         // only var assignments can be critical
         if let Operation::Opreation { kind, subterms } = op
@@ -158,23 +145,6 @@ impl EdbAnalyzer {
         }
     }
 
-    /// Checks whether the given positions is bound with respect to edb predicates
-    /// Bound if:
-    /// *edb-position
-    /// *A operation where all other variables contained are edb-annotations or bound
-    /// *TODO: lower stratum
-    /// *Bound by some annotation
-    /// TODO: check whether the negations are all correct
-    pub fn is_bound_by_edb(&self, variable: &Variable, rule: &NormalizedRule) -> bool {
-        let edb_variables_in_rule = self.edb_vars_in_rule(rule);
-        // Is directly an edb variable
-        edb_variables_in_rule.contains(variable)
-            || rule
-                .operations()
-                .iter()
-                .any(|op| self.bound_operation(variable, &edb_variables_in_rule, op))
-    }
-
     /// Returns all variables that contain values directly from the edb in them
     pub fn edb_vars_in_rule(&self, rule: &NormalizedRule) -> HashSet<Variable> {
         rule.positive()
@@ -190,31 +160,6 @@ impl EdbAnalyzer {
             })
             .cloned()
             .collect()
-    }
-
-    /// Returns the set of all bound variables in rule
-    pub fn bound_vars_in_rule(&self, rule: &NormalizedRule) -> HashSet<Variable> {
-        rule.variables()
-            .filter(|v| self.is_bound_by_edb(*v, rule))
-            .cloned()
-            .collect()
-    }
-
-    /// Returns true if the variable is bound as an ebd, i.e. contains only the variable itself as a non-edb var
-    pub fn bound_operation(
-        &self,
-        var: &Variable,
-        edb_vars: &HashSet<Variable>,
-        op: &Operation,
-    ) -> bool {
-        if let Operation::Opreation { kind, subterms: _ } = op
-            && matches!(kind, OperationKind::Equal)
-        {
-            !op.variables()
-                .any(|op_var| !(edb_vars.contains(op_var) || op_var == var))
-        } else {
-            true
-        }
     }
 }
 

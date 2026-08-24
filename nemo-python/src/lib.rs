@@ -4,7 +4,10 @@ use nemo::{
     api::load_program,
     datavalues::{AnyDataValue, DataValue},
     error::Error,
-    execution::{ExecutionEngine, tracing::trace::ExecutionTraceTree},
+    execution::{
+        ExecutionEngine, tracing::trace::ExecutionTraceTree,
+        verification_parameters::VerificationParameters,
+    },
     io::{ExportManager, ImportManager, resource_providers::ResourceProviders},
     meta::timing::TimedCode,
     rule_model::{
@@ -408,10 +411,12 @@ impl NemoEngine {
             .build()?;
 
         let import_manager = ImportManager::new(ResourceProviders::default());
+        let verification_parameters = VerificationParameters::default();
         let engine = rt
             .block_on(ExecutionEngine::initialize(
                 program.0.clone(),
                 import_manager,
+                verification_parameters,
             ))
             .py_res()?;
         Ok(NemoEngine { engine })

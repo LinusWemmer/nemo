@@ -2,7 +2,13 @@
 use std::path::PathBuf;
 
 use clap::ArgAction;
-use nemo::{error::Error, execution::execution_parameters::ExportParameters, io::ExportManager};
+use nemo::{
+    error::Error,
+    execution::{
+        execution_parameters::ExportParameters, verification_parameters::ValueAnnotationParameters,
+    },
+    io::ExportManager,
+};
 
 /// Default export directory.
 const DEFAULT_OUTPUT_DIRECTORY: &str = "results";
@@ -142,6 +148,39 @@ pub(crate) struct OutputArgs {
     pub(crate) print_facts_setting: FactPrinting,
 }
 
+/// Possible settings for checking value annotations
+#[derive(clap::ValueEnum, Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub(crate) enum ValueVerification {
+    /// Do not verify value annotations.
+    #[default]
+    None,
+    /// Verify value annotations without propatagition
+    NoProp,
+    /// Verify annotations with restriction propagation
+    Prop,
+}
+
+impl From<ValueVerification> for ValueAnnotationParameters {
+    fn from(val: ValueVerification) -> Self {
+        match val {
+            ValueVerification::None => ValueAnnotationParameters::None,
+            ValueVerification::NoProp => ValueAnnotationParameters::NoProp,
+            ValueVerification::Prop => ValueAnnotationParameters::Prop,
+        }
+    }
+}
+
+///Cli arguments for verification
+#[derive(Debug, clap::Args)]
+pub(crate) struct VerificationArgs {
+    ///Check value annotations with the following setting
+    #[arg(long = "check-annotations", value_enum, default_value_t)]
+    pub(crate) check_annotation_setting: ValueVerification,
+    ///Check termination with termination annotations
+    #[arg(long = "check-termination", default_value = "false")]
+    pub(crate) ct: bool,
+}
+
 impl OutputArgs {
     /// Creates an output file manager with the current options
     #[allow(dead_code)]
@@ -220,6 +259,9 @@ pub struct CliApp {
     /// Disable warnings when validating rule files
     #[arg(long = "no-warnings")]
     pub(crate) disable_warnings: bool,
+    /// Arguments related to verification
+    #[command(flatten)]
+    pub(crate) verification: VerificationArgs,
 }
 
 /// Key-Value pair for global variable

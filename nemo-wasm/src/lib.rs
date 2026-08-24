@@ -16,7 +16,10 @@ use web_sys::{Blob, FileReaderSync};
 use nemo::{
     datavalues::{AnyDataValue, DataValue},
     error::ReadingError,
-    execution::{ExecutionEngine, execution_parameters::ExecutionParameters},
+    execution::{
+        ExecutionEngine, execution_parameters::ExecutionParameters,
+        verification_parameters::VerificationParameters,
+    },
     io::{
         ImportManager,
         resource_providers::{ResourceProvider, ResourceProviders, http},
@@ -210,24 +213,27 @@ impl NemoEngine {
         let mut execution_parameters = ExecutionParameters::default();
         execution_parameters.set_import_manager(import_manager);
 
-        let (engine, _warnings) = ExecutionEngine::from_file(rule_file, execution_parameters)
-            .await
-            .map_err(|error| {
-                if let nemo::error::Error::ProgramReport(report) = error {
-                    // This is cursed. The report only allows writing the proper error message to
-                    // std::io::Write but not std::fmt::Write. (Strings only implement the latter...)
-                    let mut bytes: Vec<u8> = vec![];
-                    report
-                        .write(&mut bytes)
-                        .expect("We should always be able to write to a Vec<u8>.");
-                    let string = std::str::from_utf8(&bytes)
-                        .expect("Our error messages should be valid UTF-8.");
-                    NemoError(WasmOrInternalNemoError::Program(string.to_string()))
-                } else {
-                    NemoError(WasmOrInternalNemoError::Nemo(error))
-                }
-            })?
-            .into_pair();
+        let verification_parameters = VerificationParameters::default();
+
+        let (engine, _warnings) =
+            ExecutionEngine::from_file(rule_file, execution_parameters, verification_parameters)
+                .await
+                .map_err(|error| {
+                    if let nemo::error::Error::ProgramReport(report) = error {
+                        // This is cursed. The report only allows writing the proper error message to
+                        // std::io::Write but not std::fmt::Write. (Strings only implement the latter...)
+                        let mut bytes: Vec<u8> = vec![];
+                        report
+                            .write(&mut bytes)
+                            .expect("We should always be able to write to a Vec<u8>.");
+                        let string = std::str::from_utf8(&bytes)
+                            .expect("Our error messages should be valid UTF-8.");
+                        NemoError(WasmOrInternalNemoError::Program(string.to_string()))
+                    } else {
+                        NemoError(WasmOrInternalNemoError::Nemo(error))
+                    }
+                })?
+                .into_pair();
 
         Ok(NemoEngine { engine })
     }

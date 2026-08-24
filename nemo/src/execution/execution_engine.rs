@@ -11,9 +11,12 @@ use nemo_physical::{
 
 use crate::{
     error::{Error, report::ProgramReport, warned::Warned},
-    execution::planning::{
-        normalization::program::NormalizedProgram, strategy::forward::StrategyForward,
-        verification::annotation_analysis::AnnotationAnalyzer,
+    execution::{
+        planning::{
+            normalization::program::NormalizedProgram, strategy::forward::StrategyForward,
+            verification::annotation_analysis::AnnotationAnalyzer,
+        },
+        verification_parameters::VerificationParameters,
     },
     io::{formats::Export, import_manager::ImportManager},
     rule_file::RuleFile,
@@ -88,6 +91,7 @@ impl<Strategy: RuleSelectionStrategy> ExecutionEngine<Strategy> {
     pub async fn from_file(
         file: RuleFile,
         parameters: ExecutionParameters,
+        verification_parameters: VerificationParameters,
     ) -> Result<Warned<Self, ProgramReport>, Error> {
         let handle = ProgramHandle::from_file(&file);
         let report = ProgramReport::new(file);
@@ -98,7 +102,12 @@ impl<Strategy: RuleSelectionStrategy> ExecutionEngine<Strategy> {
             program.transform(TransformationDefault::new(&parameters)),
         )?;
 
-        let engine = Self::initialize(program.materialize(), parameters.import_manager).await?;
+        let engine = Self::initialize(
+            program.materialize(),
+            parameters.import_manager,
+            verification_parameters,
+        )
+        .await?;
 
         report.warned(engine)
     }
@@ -107,16 +116,23 @@ impl<Strategy: RuleSelectionStrategy> ExecutionEngine<Strategy> {
     pub async fn initialize(
         program: Program,
         import_manager: ImportManager,
+        verification_parameters: VerificationParameters,
     ) -> Result<Self, Error> {
         let normalized_program = NormalizedProgram::normalize_program(&program);
 
         // Try to verify the program
-        if normalized_program.is_annotated() {
-            log::info!("Analyzing ... ");
-            let mut analyzer = AnnotationAnalyzer::new(&normalized_program);
-            analyzer.verify_with_forward_propagation();
-            log::info!("Analyzing Done ... ");
-        }
+        log::info!("Analyzing ... ");
+        let mut analyzer = AnnotationAnalyzer::new(&normalized_program);
+        match verification_parameters.annotation_setting {
+            crate::execution::verification_parameters::ValueAnnotationParameters::None => {}
+            crate::execution::verification_parameters::ValueAnnotationParameters::NoProp => {
+                analyzer.verify_annotations(verification_parameters.ct)
+            }
+            crate::execution::verification_parameters::ValueAnnotationParameters::Prop => {
+                analyzer.verify_with_forward_propagation(verification_parameters.ct)
+            }
+        };
+        log::info!("Analyzing Done ... ");
 
         let mut table_manager = TableManager::new();
         Self::register_all_predicates(&mut table_manager, &normalized_program);
@@ -435,7 +451,11 @@ mod test {
     use test_log;
     use tokio;
 
-    use crate::{api::load_program, execution::DefaultExecutionEngine, io::ImportManager};
+    use crate::{
+        api::load_program,
+        execution::{DefaultExecutionEngine, verification_parameters::VerificationParameters},
+        io::ImportManager,
+    };
 
     #[tokio::test]
     #[test_log::test]
@@ -444,10 +464,15 @@ mod test {
         const ITERATIONS: usize = 16_384;
         let program = load_program("foo(bar).".to_string(), Default::default()).unwrap();
         let import_manager = ImportManager::new(Default::default());
+        let verification_parameters = VerificationParameters::default();
 
         for _ in 1..=ITERATIONS {
-            let engine =
-                DefaultExecutionEngine::initialize(program.clone(), import_manager.clone()).await;
+            let engine = DefaultExecutionEngine::initialize(
+                program.clone(),
+                import_manager.clone(),
+                verification_parameters,
+            )
+            .await;
             assert_matches!(engine, Ok(_));
         }
     }

@@ -39,6 +39,7 @@ use nemo::{
         DefaultExecutionEngine, ExecutionEngine,
         execution_parameters::ExecutionParameters,
         tracing::{node_query::TableEntriesForTreeNodesQuery, tree_query::TreeForTableQuery},
+        verification_parameters::{ValueAnnotationParameters, VerificationParameters},
     },
     io::{ImportManager, resource_providers::ResourceProviders},
     meta::timing::{TimedCode, TimedDisplay},
@@ -288,9 +289,15 @@ async fn run(mut cli: CliApp) -> Result<(), CliError> {
         return Err(CliError::InvalidParameter { parameter });
     }
 
-    let (mut engine, warnings) = ExecutionEngine::from_file(program_file, execution_parameters)
-        .await?
-        .into_pair();
+    let value_annotation_parameters: ValueAnnotationParameters =
+        cli.verification.check_annotation_setting.into();
+    let verification_parameters =
+        VerificationParameters::new(cli.verification.ct, value_annotation_parameters);
+
+    let (mut engine, warnings) =
+        ExecutionEngine::from_file(program_file, execution_parameters, verification_parameters)
+            .await?
+            .into_pair();
     warnings.eprint(cli.disable_warnings)?;
 
     log::info!("Rules parsed");

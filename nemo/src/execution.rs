@@ -13,6 +13,7 @@ pub mod execution_parameters;
 pub mod planning;
 pub mod selection_strategy;
 pub mod tracing;
+pub mod verification_parameters;
 
 /// The default strategy that will be used for reasoning
 pub type DefaultExecutionStrategy = StrategyStratifiedNegation<
