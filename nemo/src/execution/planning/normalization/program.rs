@@ -166,7 +166,7 @@ impl NormalizedProgram {
     }
 
     /// Returns true if there is an annotation for the given predicate
-    pub fn has_termination_annotation_predicate(&self, predicate: &Tag) -> bool {
+    pub fn predicate_has_termination_annotation(&self, predicate: &Tag) -> bool {
         self.termination_annotations
             .iter()
             .any(|a| &a.head().predicate() == predicate)

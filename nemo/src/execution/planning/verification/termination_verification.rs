@@ -359,7 +359,7 @@ impl TerminationVerifier {
         println!("{cycle_predicate}");
         if self
             .program
-            .has_termination_annotation_predicate(cycle_predicate)
+            .predicate_has_termination_annotation(cycle_predicate)
         {
             let potential_starts: Vec<usize> = rule_cycle
                 .iter()
@@ -402,7 +402,7 @@ impl TerminationVerifier {
             .enumerate()
             .filter(|(_, rule)| {
                 self.program
-                    .has_termination_annotation_predicate(&rule.head()[0].predicate())
+                    .predicate_has_termination_annotation(&rule.head()[0].predicate())
             })
             .map(|(p, _)| p)
             .collect();
@@ -438,7 +438,7 @@ impl TerminationVerifier {
 
     /// Checks all cycles for the scc
     pub fn check_scc_termination(&self, scc: &Vec<usize>) -> bool {
-        let propagation_graph = PropagationGraph::build_graph(&scc, self.program.rules());
+        let propagation_graph = PropagationGraph::build_graph(&self.program, &scc);
         if propagation_graph.is_weakly_acyclic() {
             println!("weakly acyclic");
             return true;

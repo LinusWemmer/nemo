@@ -5,10 +5,15 @@ use graph_cycles::Cycles;
 use itertools::Itertools;
 
 use crate::{
-    execution::planning::normalization::{operation::Operation, rule::NormalizedRule},
+    execution::planning::normalization::{
+        operation::Operation, program::NormalizedProgram, rule::NormalizedRule,
+    },
     rule_model::components::{
         tag::Tag,
-        term::{operation::operation_kind::OperationKind, primitive::Primitive::Variable},
+        term::{
+            operation::operation_kind::OperationKind,
+            primitive::{Primitive, variable::Variable},
+        },
     },
 };
 
@@ -30,27 +35,6 @@ impl PropagationGraph {
     /// Returns the petgraph graph
     pub fn graph(&self) -> &Graph<(Tag, usize), (usize, bool), Directed> {
         &self.graph
-    }
-
-    /// Returns all special cycles
-    /// TODO: multigraph, ie.e fix line 44
-    pub fn special_cycles(&self) -> Vec<Vec<NodeIndex>> {
-        let mut special_cycles = Vec::new();
-        for cycle in self.graph.cycles() {
-            let size = cycle.len();
-            if cycle.iter().enumerate().any(|(c_i, current_node)| {
-                let c_j = (c_i + 1) % size;
-                let next_node: NodeIndex = cycle[c_j];
-                if let Some(edge_index) = self.graph.find_edge(*current_node, next_node) {
-                    self.graph.edge_weight(edge_index).expect("msg").1
-                } else {
-                    false
-                }
-            }) {
-                special_cycles.push(cycle);
-            }
-        }
-        special_cycles
     }
 
     /// Provides the predicates that are contained in a cycle
@@ -215,10 +199,11 @@ impl PropagationGraph {
     /// Builds a dependency graph for the strongly connected components of the program
     /// The nodes are positions in the predicate and the edges are dependencies between positions
     /// Only computes for the given scc
-    pub fn build_graph(positions: &Vec<usize>, rules: &Vec<NormalizedRule>) -> Self {
+    pub fn build_graph(program: &NormalizedProgram, rule_indices: &Vec<usize>) -> Self {
         let mut graph = petgraph::graph::DiGraph::new();
 
-        let scc_rules: Vec<(&NormalizedRule, usize)> = positions
+        let rules = program.rules();
+        let scc_rules: Vec<(&NormalizedRule, usize)> = rule_indices
             .iter()
             .map(|rule_index| (&rules[*rule_index], rule_index.clone()))
             .collect();
@@ -239,7 +224,9 @@ impl PropagationGraph {
 
             for (pos_h, term) in head_atom.terms().enumerate() {
                 match term {
-                    Variable(var_h) => {
+                    Primitive::Variable(var_h) => {
+                        let body_vars: HashSet<&Variable> =
+                            rule.positive().iter().flat_map(|b| b.terms()).collect();
                         for body_atom in rule.positive() {
                             for (pos_b, var_b) in body_atom.terms().enumerate() {
                                 if var_b == var_h {
@@ -253,11 +240,14 @@ impl PropagationGraph {
                                     graph.add_edge(*node_body, *node_head, (rule_index, false));
                                 }
                                 //TODO: check if the critical var is actually bound by an edb expression, then it shouldn't be marked
-                                //TODO: actually only if not in body atom
+                                //TODO: actually only if not in other body atom
+
                                 for op in rule.operations() {
                                     if PropagationGraph::critical_operation(op) {
                                         if op.variables().contains(var_h)
                                             && op.variables().contains(var_b)
+                                            && !body_vars.contains(var_h)
+                                            && !PropagationGraph::is_bound(program, rule, var_h)
                                         {
                                             let node_body = predicate_pos_to_node_index
                                                 .get(&(body_atom.predicate(), pos_b))
@@ -281,6 +271,37 @@ impl PropagationGraph {
             }
         }
         Self { graph }
+    }
+
+    /// Returns true if the variable is bound
+    pub fn is_bound(program: &NormalizedProgram, rule: &NormalizedRule, var: &Variable) -> bool {
+        let mut lower_bound = false;
+        let mut upper_bound = false;
+        for op in rule.operations() {
+            if !lower_bound
+                && let Some(v_bound) = op.is_lower_bound()
+                && var == v_bound
+            {
+                lower_bound = true;
+            } else if !upper_bound
+                && let Some(v_bound) = op.is_upper_bound()
+                && var == v_bound
+            {
+                upper_bound = true;
+            }
+        }
+        let head_atom = &rule.head()[0];
+        let annotations = program.predicate_to_global_annotation(&head_atom.predicate());
+        for annotation in annotations {
+            if !lower_bound && annotation.bound_below_vars(head_atom).contains(var) {
+                lower_bound = true;
+            }
+            if !upper_bound && annotation.bound_above_vars(head_atom).contains(var) {
+                upper_bound = true;
+            }
+        }
+
+        lower_bound && upper_bound
     }
 
     /// Returns true if the operation creates a new value for the variable

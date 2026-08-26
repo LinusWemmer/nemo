@@ -112,6 +112,8 @@ impl AnnotationAnalyzer {
             }
         }
 
+        verifier.print_restriciton();
+
         let mut valid = true;
         for rule in self.program.rules() {
             println!("Checking rule: {rule}");

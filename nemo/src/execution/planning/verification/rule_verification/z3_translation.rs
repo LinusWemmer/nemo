@@ -161,10 +161,9 @@ impl RuleTranslator {
         rule_predicate: &BodyAtom,
         var_cache: &HashMap<Variable, Int>,
     ) -> Bool {
-        // define the variable substitution: TODO: turn these into
+        // define the variable substitution:
         let substitution = rule_predicate.terms().zip(assertion.variables());
 
-        // This sort of defines a "substitution"
         // This is only possible if all variables in the assertion head are different
         let var_sub: HashMap<Variable, Int> = substitution
             .map(|(v_rule, v_assert)| {
@@ -199,12 +198,7 @@ impl RuleTranslator {
         program: &NormalizedProgram,
     ) -> (Vec<Bool>, Vec<Bool>) {
         let mut body_annotations = Vec::new();
-
-        //TODO: should this be moved to the verification, i.e. rule and assertion seperately?
         for atom in rule.positive() {
-            //let smt_atom = self.translate_body_atom(atom, &var_cache);
-            //body_terms.push(smt_atom); TODO: maybe still neccesary?
-
             body_annotations.extend(
                 program
                     .predicate_to_global_annotation(&atom.predicate())

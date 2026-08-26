@@ -178,6 +178,82 @@ impl Operation {
 
         None
     }
+
+    /// Check whether this operation is a syntactic upper bound for a variable
+    /// If so, return the bound variable
+    ///
+    /// #Panics
+    /// Panics if the component is invalid
+    pub fn is_upper_bound(&self) -> Option<&Variable> {
+        if let Self::Opreation { kind, subterms } = self {
+            match kind {
+                OperationKind::Equal => None,
+                OperationKind::NumericGreaterthaneq | OperationKind::NumericGreaterthan => {
+                    let left = subterms.first().expect("invalid program component");
+                    let right = subterms.get(1).expect("invalid program component");
+                    if let Self::Primitive(Primitive::Variable(variable)) = right
+                        && let Self::Primitive(Primitive::Ground(_)) = left
+                    {
+                        Some(variable)
+                    } else {
+                        None
+                    }
+                }
+                OperationKind::NumericLessthaneq | OperationKind::NumericLessthan => {
+                    let left = subterms.first().expect("invalid program component");
+                    let right = subterms.get(1).expect("invalid program component");
+                    if let Self::Primitive(Primitive::Variable(variable)) = left
+                        && let Self::Primitive(Primitive::Ground(_)) = right
+                    {
+                        Some(variable)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Check whether this operation is a syntactic lower bound for a variable
+    /// If so, return the bound variable
+    ///
+    /// #Panics
+    /// Panics if the component is invalid
+    pub fn is_lower_bound(&self) -> Option<&Variable> {
+        if let Self::Opreation { kind, subterms } = self {
+            match kind {
+                OperationKind::Equal => None,
+                OperationKind::NumericGreaterthaneq | OperationKind::NumericGreaterthan => {
+                    let left = subterms.first().expect("invalid program component");
+                    let right = subterms.get(1).expect("invalid program component");
+                    if let Self::Primitive(Primitive::Variable(variable)) = left
+                        && let Self::Primitive(Primitive::Ground(_)) = right
+                    {
+                        Some(variable)
+                    } else {
+                        None
+                    }
+                }
+                OperationKind::NumericLessthaneq | OperationKind::NumericLessthan => {
+                    let left = subterms.first().expect("invalid program component");
+                    let right = subterms.get(1).expect("invalid program component");
+                    if let Self::Primitive(Primitive::Variable(variable)) = right
+                        && let Self::Primitive(Primitive::Ground(_)) = left
+                    {
+                        Some(variable)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl Operation {

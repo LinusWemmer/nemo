@@ -4,9 +4,11 @@ use std::fmt::Display;
 
 use crate::{
     execution::planning::normalization::{
-        atom::body::BodyAtom, generator::VariableGenerator, operation::Operation,
+        atom::{body::BodyAtom, head::HeadAtom},
+        generator::VariableGenerator,
+        operation::Operation,
     },
-    rule_model::components::term::primitive::variable::Variable,
+    rule_model::components::term::primitive::{Primitive, variable::Variable},
 };
 
 /// Represents a normalized Global Annotation
@@ -28,6 +30,54 @@ impl NormalizedGlobalAnnotation {
     /// Return the list of body operations of the annotation
     pub fn body(&self) -> &Vec<Operation> {
         &self.body
+    }
+
+    /// Returns a list of vars for which the restriction provides an upper bound if applied to the body atom
+    ///
+    /// # Panics
+    /// Panics if the predicates of the annotation and atom don't match
+    pub fn bound_above_vars(&self, atom: &HeadAtom) -> Vec<Variable> {
+        if atom.predicate() != self.head.predicate() {
+            panic!("Annotation doesn't match atom")
+        }
+        let bound_above_vars: Vec<&Variable> = self
+            .body()
+            .iter()
+            .filter_map(|b| b.is_upper_bound())
+            .collect();
+        self.head()
+            .terms()
+            .zip(atom.terms())
+            .filter(|(v_ann, _)| bound_above_vars.contains(&v_ann))
+            .filter_map(|(_, term)| match term {
+                Primitive::Variable(v_atom) => Some(v_atom.clone()),
+                Primitive::Ground(_) => None,
+            })
+            .collect()
+    }
+
+    /// Returns a list of vars for which the restriction provides a lower bound if applied to the body atom
+    ///
+    /// # Panics
+    /// Panics if the predicates of the annotation and atom don't match
+    pub fn bound_below_vars(&self, atom: &HeadAtom) -> Vec<Variable> {
+        if atom.predicate() != self.head.predicate() {
+            panic!("Annotation doesn't match atom")
+        }
+        let bound_above_vars: Vec<&Variable> = self
+            .body()
+            .iter()
+            .filter_map(|b| b.is_lower_bound())
+            .collect();
+        self.head()
+            .terms()
+            .zip(atom.terms())
+            .filter(|(v_ann, _)| bound_above_vars.contains(&v_ann))
+            .filter_map(|(_, term)| match term {
+                Primitive::Variable(v_atom) => Some(v_atom.clone()),
+                Primitive::Ground(_) => None,
+            })
+            .collect()
     }
 }
 

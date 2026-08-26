@@ -105,10 +105,7 @@ impl RuleVerifier {
             .filter_map(|body_atom| {
                 self.predicate_restrictions
                     .get(&body_atom.predicate())
-                    .and_then(|res| {
-                        println!("{body_atom} restriction: {res}");
-                        Some(res.get_restrictions_for_body(body_atom, var_cache))
-                    })
+                    .and_then(|res| Some(res.get_restrictions_for_body(body_atom, var_cache)))
             })
             .collect()
     }
@@ -186,6 +183,13 @@ impl RuleVerifier {
                 z3::SatResult::Sat => println!("Fact verified."),
             }
             solver.pop(1);
+        }
+    }
+
+    /// Print all restrictions
+    pub fn print_restriciton(&self) {
+        for (tag, restriction) in &self.predicate_restrictions {
+            println!("{tag} restriction: {restriction}");
         }
     }
 
