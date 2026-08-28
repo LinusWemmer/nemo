@@ -69,28 +69,33 @@ impl RuleVerifier {
     pub fn gather_filters(&mut self, program: &NormalizedProgram) {
         let mut filters: Vec<Operation> = Vec::new();
         for rule in program.rules() {
-            let rule_filters = rule.operations().iter().filter(|b| b.is_simple_filter());
+            let rule_filters = rule
+                .operations()
+                .iter()
+                .filter_map(|b| b.get_filter_from_op());
             for filter in rule_filters {
                 if !filters
                     .iter()
-                    .any(|f: &Operation| f.equivalent_up_to_renaming(filter))
+                    .any(|f: &Operation| f.equivalent_up_to_renaming(&filter))
                 {
                     filters.push(filter.clone())
                 }
             }
         }
         for annotation in program.global_annotations() {
-            let annotation_filters = annotation.body().iter().filter(|b| b.is_simple_filter());
+            let annotation_filters = annotation
+                .body()
+                .iter()
+                .filter_map(|b| b.get_filter_from_op());
             for filter in annotation_filters {
                 if !filters
                     .iter()
-                    .any(|f: &Operation| f.equivalent_up_to_renaming(filter))
+                    .any(|f: &Operation| f.equivalent_up_to_renaming(&filter))
                 {
                     filters.push(filter.clone())
                 }
             }
         }
-        //TODO: check filters for equivalence and so on
         self.filter_predicates = filters.iter().map(|f| Filter::new(f.clone())).collect();
     }
 
@@ -139,6 +144,7 @@ impl RuleVerifier {
             let head_assertion =
                 translator.translate_head_assertion(head_atom_assertion, head, &var_cache);
             solver.assert(&head_assertion.not());
+            println!("{}", solver.to_smt2());
             match solver.check() {
                 z3::SatResult::Unsat => {
                     println!("Validated: spec for {head_atom_assertion} holds");

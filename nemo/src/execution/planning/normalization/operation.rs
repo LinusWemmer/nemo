@@ -80,8 +80,8 @@ impl Operation {
         }
     }
 
-    /// Check whether this operation is a simple filter expression of the form x < c or similar
-    pub fn is_simple_filter(&self) -> bool {
+    /// Check whether this operation is a simple filter expression of the form _< c or similar
+    pub fn get_filter_from_op(&self) -> Option<Operation> {
         let filter_exp = {
             |kind: &OperationKind| match kind {
                 OperationKind::NumericGreaterthaneq => true,
@@ -92,20 +92,32 @@ impl Operation {
             }
         };
         match self {
-            Operation::Primitive(_) => false,
+            Operation::Primitive(_) => None,
             Operation::Opreation { kind, subterms } => {
                 let left = subterms.first().expect("invalid program component");
                 let right = subterms.get(1).expect("invalid program component");
-                if let Self::Primitive(Primitive::Variable(_)) = left
-                    && let Self::Primitive(Primitive::Ground(_)) = right
+                if let Self::Primitive(Primitive::Ground(_)) = right
+                    && filter_exp(kind)
                 {
-                    filter_exp(kind)
-                } else if let Self::Primitive(Primitive::Variable(_)) = right
-                    && let Self::Primitive(Primitive::Ground(_)) = left
+                    let fresh_var = Variable::universal("placeholder");
+                    let new_left = Self::new_variable(fresh_var);
+                    let new_subterms = vec![new_left, right.clone()];
+                    Some(Self::Opreation {
+                        kind: kind.clone(),
+                        subterms: new_subterms,
+                    })
+                } else if let Self::Primitive(Primitive::Ground(_)) = left
+                    && filter_exp(kind)
                 {
-                    filter_exp(kind)
+                    let fresh_var = Variable::universal("placeholder");
+                    let new_right = Self::new_variable(fresh_var);
+                    let new_subterms = vec![left.clone(), new_right];
+                    Some(Self::Opreation {
+                        kind: kind.clone(),
+                        subterms: new_subterms,
+                    })
                 } else {
-                    false
+                    None
                 }
             }
         }
