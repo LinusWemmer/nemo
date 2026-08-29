@@ -5,8 +5,8 @@ use nemo::{
     datavalues::{AnyDataValue, DataValue},
     error::Error,
     execution::{
-        ExecutionEngine, tracing::trace::ExecutionTraceTree,
-        verification_parameters::VerificationParameters,
+        ExecutionEngine, execution_parameters::ExecutionParameters,
+        tracing::trace::ExecutionTraceTree, verification_parameters::VerificationParameters,
     },
     io::{ExportManager, ImportManager, resource_providers::ResourceProviders},
     meta::timing::TimedCode,
@@ -52,7 +52,7 @@ impl<T> PythonResult for (T, Vec<Error>) {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 struct NemoProgram(nemo::rule_model::programs::program::Program);
 
@@ -336,7 +336,7 @@ struct NemoEngine {
     engine: nemo::execution::DefaultExecutionEngine,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 struct NemoTiming {
     #[pyo3(get)]
@@ -410,12 +410,12 @@ impl NemoEngine {
             .enable_all()
             .build()?;
 
-        let import_manager = ImportManager::new(ResourceProviders::default());
+        let execution_parameters = ExecutionParameters::default();
         let verification_parameters = VerificationParameters::default();
         let engine = rt
-            .block_on(ExecutionEngine::initialize(
-                program.0.clone(),
-                import_manager,
+            .block_on(ExecutionEngine::from_program(
+                program.0,
+                execution_parameters,
                 verification_parameters,
             ))
             .py_res()?;
@@ -446,7 +446,7 @@ impl NemoEngine {
         let fact = Fact::parse(&fact_string).ok()?;
         fact.validate().ok()?;
 
-        let (trace, handles) = rt.block_on(self.engine.trace(vec![fact])).ok()?;
+        let (trace, handles) = rt.block_on(self.engine.trace_facts(vec![fact])).ok()?;
         let handle = *handles
             .first()
             .expect("Function trace always returns a handle for each input fact");
