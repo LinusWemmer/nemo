@@ -30,7 +30,7 @@ pub enum Operation {
     Operation {
         /// Type of operation
         kind: OperationKind,
-        /// Input to the opreation
+        /// Input to the operation
         subterms: Vec<Operation>,
     },
 }
@@ -93,7 +93,7 @@ impl Operation {
         };
         match self {
             Operation::Primitive(_) => None,
-            Operation::Opreation { kind, subterms } => {
+            Operation::Operation { kind, subterms } => {
                 let left = subterms.first().expect("invalid program component");
                 let right = subterms.get(1).expect("invalid program component");
                 if let Self::Primitive(Primitive::Ground(_)) = right
@@ -102,7 +102,7 @@ impl Operation {
                     let fresh_var = Variable::universal("placeholder");
                     let new_left = Self::new_variable(fresh_var);
                     let new_subterms = vec![new_left, right.clone()];
-                    Some(Self::Opreation {
+                    Some(Self::Operation {
                         kind: kind.clone(),
                         subterms: new_subterms,
                     })
@@ -112,7 +112,7 @@ impl Operation {
                     let fresh_var = Variable::universal("placeholder");
                     let new_right = Self::new_variable(fresh_var);
                     let new_subterms = vec![left.clone(), new_right];
-                    Some(Self::Opreation {
+                    Some(Self::Operation {
                         kind: kind.clone(),
                         subterms: new_subterms,
                     })
@@ -132,11 +132,11 @@ impl Operation {
                 _ => false,
             },
             (
-                Operation::Opreation {
+                Operation::Operation {
                     kind: k1,
                     subterms: s1,
                 },
-                Operation::Opreation {
+                Operation::Operation {
                     kind: k2,
                     subterms: s2,
                 },
@@ -197,7 +197,7 @@ impl Operation {
     /// #Panics
     /// Panics if the component is invalid
     pub fn is_upper_bound(&self) -> Option<&Variable> {
-        if let Self::Opreation { kind, subterms } = self {
+        if let Self::Operation { kind, subterms } = self {
             match kind {
                 OperationKind::Equal => None,
                 OperationKind::NumericGreaterthaneq | OperationKind::NumericGreaterthan => {
@@ -235,7 +235,7 @@ impl Operation {
     /// #Panics
     /// Panics if the component is invalid
     pub fn is_lower_bound(&self) -> Option<&Variable> {
-        if let Self::Opreation { kind, subterms } = self {
+        if let Self::Operation { kind, subterms } = self {
             match kind {
                 OperationKind::Equal => None,
                 OperationKind::NumericGreaterthaneq | OperationKind::NumericGreaterthan => {

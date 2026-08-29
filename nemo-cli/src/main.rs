@@ -34,7 +34,6 @@ use nemo::{
     execution::{
         DefaultExecutionEngine, ExecutionEngine,
         execution_parameters::ExecutionParameters,
-        tracing::{node_query::TableEntriesForTreeNodesQuery, tree_query::TreeForTableQuery},
         verification_parameters::{ValueAnnotationParameters, VerificationParameters},
     },
     io::{ImportManager, resource_providers::ResourceProviders},
@@ -42,6 +41,8 @@ use nemo::{
     rule_file::RuleFile,
     rule_model::components::{fact::Fact, tag::Tag, term::Term},
 };
+
+use nemo::execution::planning::normalization::program::NormalizedProgram;
 use tracing::handle_tracing;
 
 fn print_facts_for_table<W: Write>(

@@ -128,7 +128,7 @@ impl EdbAnalyzer {
     /// Returns true if the operation potentially creates a new value for the variable
     pub fn critical_operation(op: &Operation) -> bool {
         // only var assignments can be critical
-        if let Operation::Opreation { kind, subterms } = op
+        if let Operation::Operation { kind, subterms } = op
             && matches!(kind, OperationKind::Equal)
         {
             let left = subterms.first().expect("invalid program component");

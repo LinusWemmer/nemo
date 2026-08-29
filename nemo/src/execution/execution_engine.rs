@@ -127,7 +127,8 @@ impl<Strategy: RuleSelectionStrategy> ExecutionEngine<Strategy> {
         import_manager: ImportManager,
         verification_parameters: VerificationParameters,
     ) -> Result<Self, Error> {
-        let normalized_program = NormalizedProgram::normalize_program(&program_handle);
+        let normalized_program =
+            NormalizedProgram::normalize_program(&program_handle.materialize());
 
         // Try to verify the program
         log::info!("Analyzing ... ");
@@ -471,7 +472,6 @@ mod test {
             DefaultExecutionEngine, execution_parameters::ExecutionParameters,
             verification_parameters::VerificationParameters,
         },
-        io::ImportManager,
     };
 
     #[tokio::test]

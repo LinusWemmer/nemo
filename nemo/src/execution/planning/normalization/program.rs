@@ -310,7 +310,7 @@ impl NormalizedProgram {
     ///
     /// # Panics
     /// Panics if the program is ill-formed.
-    pub fn normalize_program(program: &crate::rule_model::programs::handle::ProgramHandle) -> Self {
+    pub fn normalize_program(program: &crate::rule_model::programs::program::Program) -> Self {
         let mut result = Self::default();
 
         // Handle facts

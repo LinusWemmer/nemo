@@ -8,7 +8,7 @@ use nemo::{
         ExecutionEngine, execution_parameters::ExecutionParameters,
         tracing::trace::ExecutionTraceTree, verification_parameters::VerificationParameters,
     },
-    io::{ExportManager, ImportManager, resource_providers::ResourceProviders},
+    io::ExportManager,
     meta::timing::TimedCode,
     rule_model::{
         components::{

@@ -52,7 +52,7 @@ impl RuleTranslator {
             Operation::Primitive(primitive) => {
                 self.translate_primitive(primitive, var_cache).into()
             }
-            Operation::Opreation { kind, subterms } => {
+            Operation::Operation { kind, subterms } => {
                 let left = self.translate_operation(
                     subterms.first().expect("Formula wasn't well formed"),
                     var_cache,
