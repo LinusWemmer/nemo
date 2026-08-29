@@ -144,7 +144,6 @@ impl RuleVerifier {
             let head_assertion =
                 translator.translate_head_assertion(head_atom_assertion, head, &var_cache);
             solver.assert(&head_assertion.not());
-            println!("{}", solver.to_smt2());
             match solver.check() {
                 z3::SatResult::Unsat => {
                     println!("Validated: spec for {head_atom_assertion} holds");
@@ -152,20 +151,9 @@ impl RuleVerifier {
                 }
                 z3::SatResult::Unknown => println!("Could not validate (unknown)"),
                 z3::SatResult::Sat => {
-                    let model = solver.get_model().expect("Sat model should exist");
-                    let var_interpretation: String = head
-                        .variables()
-                        .map(|v| {
-                            let inter = model
-                                .get_const_interp(var_cache.get(v).expect("Var should be in cache"))
-                                .expect("Counterexample should exist for violation");
-                            format!("{} : {}", v, inter)
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ");
                     println!(
-                        "Rule {} might lead to violation of {} with var assigment {}. ",
-                        rule, head_atom_assertion, var_interpretation
+                        "Rule {} might lead to violation of annotation {}. ",
+                        rule, head_atom_assertion
                     );
                     valid = false;
                 }
@@ -317,20 +305,9 @@ impl RuleVerifier {
                 }
                 z3::SatResult::Unknown => println!("Could not validate (unknown)"),
                 z3::SatResult::Sat => {
-                    let model = solver.get_model().expect("Sat model should exist");
-                    let var_interpretation: String = head
-                        .variables()
-                        .map(|v| {
-                            let inter = model
-                                .get_const_interp(var_cache.get(v).expect("Var should be in cache"))
-                                .expect("Counterexample should exist for violation");
-                            format!("{} : {}", v, inter)
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ");
                     println!(
-                        "Rule {} might lead to violation of {} with var assigment {}. ",
-                        rule, head_atom_assertion, var_interpretation
+                        "Rule {} might lead to violation of annotation {}. ",
+                        rule, head_atom_assertion
                     );
                     valid = false;
                 }

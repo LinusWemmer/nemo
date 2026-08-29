@@ -104,15 +104,12 @@ impl AnnotationAnalyzer {
             let mut delta = true;
             while delta {
                 delta = false;
-
                 for rule_index in &scc {
                     let rule = &self.program.rules()[*rule_index];
                     delta = verifier.forward_propagation(self.program(), rule) || delta;
                 }
             }
         }
-
-        verifier.print_restriciton();
 
         let mut valid = true;
         for rule in self.program.rules() {
