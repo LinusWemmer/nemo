@@ -21,11 +21,11 @@ pub enum TerminationDirection {
 /// Represents a normalized Global Annotation
 #[derive(Debug, Clone)]
 pub struct NormalizedTerminationAnnotation {
-    ///Headatom of the annotation TODO: maybe make this a body atom?
+    ///Atom for the predicate that is being annotated
     head: BodyAtom,
     /// Direction in which the termination happesn
     direction: TerminationDirection,
-    /// Restrictions placed on the head atom, TODO
+    /// Restrictions placed on the predicate
     body: Operation,
 }
 

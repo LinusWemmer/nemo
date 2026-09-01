@@ -464,7 +464,6 @@ impl TerminationVerifier {
 
                     if !termination_proven {
                         print!("Termination for cycle: ");
-                        // TODO: make pretty
                         TerminationVerifier::print_cycle(&rule_cycle);
                         println!(
                             "could not be verified. Consider adding annotations if you believe the cycle terminates"
@@ -482,7 +481,6 @@ impl TerminationVerifier {
 
                 if !termination_proven {
                     print!("Termination for cycle: ");
-                    // TODO: make pretty
                     TerminationVerifier::print_cycle(&rule_cycle);
                     println!(
                         "could not be verified. Consider adding annotations if you believe the cycle terminates"

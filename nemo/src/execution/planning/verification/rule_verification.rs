@@ -146,14 +146,13 @@ impl RuleVerifier {
             solver.assert(&head_assertion.not());
             match solver.check() {
                 z3::SatResult::Unsat => {
-                    println!("Validated: spec for {head_atom_assertion} holds");
+                    println!("Validated: spec {head_atom_assertion} holds for rule.");
                     valid = valid && true
                 }
                 z3::SatResult::Unknown => println!("Could not validate (unknown)"),
                 z3::SatResult::Sat => {
                     println!(
-                        "Rule {} might lead to violation of annotation {}. ",
-                        rule, head_atom_assertion
+                        "Validation Failded: Rule {rule} might lead to violation of annotation {head_atom_assertion}. ",
                     );
                     valid = false;
                 }
@@ -165,19 +164,30 @@ impl RuleVerifier {
     }
 
     /// Verifies whether a fact in a program satisfies it assertions
-    pub fn verify_facts(&self, fact: &GroundAtom, program: &NormalizedProgram) {
+    pub fn verify_facts(&self, fact: &GroundAtom, program: &NormalizedProgram) -> bool {
+        let mut valid = true;
         let translator = RuleTranslator::new();
         let solver = Solver::new();
         for annotation in program.predicate_to_global_annotation(&fact.predicate()) {
             solver.push();
             solver.assert(translator.translate_ground_assertion(annotation, fact));
             match solver.check() {
-                z3::SatResult::Unsat => println!("{fact} does not satisfy assertion {annotation} "),
-                z3::SatResult::Unknown => println!("Could not validate {fact}"),
-                z3::SatResult::Sat => println!("Fact verified."),
+                z3::SatResult::Unsat => {
+                    println!("{fact} does not satisfy assertion {annotation} ");
+                    valid = false;
+                }
+                z3::SatResult::Unknown => {
+                    println!("Could not validate {fact}");
+                    valid = false;
+                }
+                z3::SatResult::Sat => {
+                    println!("Fact {fact} verified.");
+                    valid = valid && true;
+                }
             }
             solver.pop(1);
         }
+        valid
     }
 
     /// Print all restrictions
@@ -200,8 +210,19 @@ impl RuleVerifier {
         let var_cache = RuleVerifier::create_var_cache(rule);
         let translator = RuleTranslator::new();
 
+        let derived_predicates = program.derived_predicates();
+        let edb_predicates: Vec<Tag> = program
+            .predicates()
+            .filter_map(|(tag, _)| {
+                if derived_predicates.contains(&tag) {
+                    None
+                } else {
+                    Some(tag)
+                }
+            })
+            .collect();
         let (body_operations, body_annotations) =
-            translator.translate_rule(rule, &var_cache, program);
+            translator.translate_rule_edb_annotations(rule, &var_cache, program, &edb_predicates);
         for op in body_operations {
             solver.assert(&op);
         }
@@ -239,7 +260,6 @@ impl RuleVerifier {
                         res.add_restriction_from_propagation(head, &var_cache, &head_res) || delta;
                 })
                 .or_insert_with(|| {
-                    //TODO: somehow fix the stuff wiht entailment
                     delta = true;
                     Restriction::new_from_propagation(head, &var_cache, &head_res)
                 });
@@ -252,7 +272,6 @@ impl RuleVerifier {
                         res.add_restriction_from_propagation(head, &var_cache, &head_res) || delta;
                 })
                 .or_insert_with(|| {
-                    //TODO: somehow fix the stuff wiht entailment
                     delta = true;
                     Restriction::new_from_propagation(head, &var_cache, &head_res)
                 });
@@ -300,14 +319,13 @@ impl RuleVerifier {
             solver.assert(&head_assertion.not());
             match solver.check() {
                 z3::SatResult::Unsat => {
-                    println!("Validated: spec for {head_atom_assertion} holds");
+                    println!("Validated: spec {head_atom_assertion} holds for rule.");
                     valid = valid && true
                 }
                 z3::SatResult::Unknown => println!("Could not validate (unknown)"),
                 z3::SatResult::Sat => {
                     println!(
-                        "Rule {} might lead to violation of annotation {}. ",
-                        rule, head_atom_assertion
+                        "Validation Failded: Rule {rule} might lead to violation of annotation {head_atom_assertion}. ",
                     );
                     valid = false;
                 }

@@ -160,6 +160,13 @@ impl NormalizedProgram {
             .collect()
     }
 
+    /// Returns true if there is an global annotation for the given predicate
+    pub fn predicate_has_global_annotation(&self, predicate: &Tag) -> bool {
+        self.global_annotations
+            .iter()
+            .any(|a| &a.head().predicate() == predicate)
+    }
+
     /// Returns the termination annotation for the given predicate
     pub fn predicate_to_termination_annotation(
         &self,
@@ -171,7 +178,7 @@ impl NormalizedProgram {
             .collect()
     }
 
-    /// Returns true if there is an annotation for the given predicate
+    /// Returns true if there is a termination annotation for the given predicate
     pub fn predicate_has_termination_annotation(&self, predicate: &Tag) -> bool {
         self.termination_annotations
             .iter()

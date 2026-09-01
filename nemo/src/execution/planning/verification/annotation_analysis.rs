@@ -62,37 +62,47 @@ impl AnnotationAnalyzer {
     pub fn verify_annotations(&mut self, ct: bool) {
         let mut verifier = RuleVerifier::new();
 
+        let mut valid = true;
         for fact in self.program.facts() {
-            verifier.verify_facts(fact, self.program());
+            valid = verifier.verify_facts(fact, self.program()) && valid;
         }
 
         self.rule_graph.reset_scc_count();
 
-        let mut valid = true;
-
-        // actually not really necessary
-        while let Some(scc) = self.rule_graph.next_scc() {
-            for rule_index in &scc {
-                let rule = &self.program.rules()[*rule_index];
-                println!("Checking rule {rule_index}: {rule}");
+        for (rule_index, rule) in self.program.rules().iter().enumerate() {
+            println!("Checking rule {rule_index}:");
+            if self
+                .program
+                .predicate_has_global_annotation(&rule.head()[0].predicate())
+            {
                 valid = verifier.verify_rule(self.program(), rule) && valid;
+            } else {
+                println!("\t Rule {rule_index} head predicate not annotated.");
             }
         }
+
         if valid {
-            println!("Annotations could be verified to have no contradictions")
+            println!("Value annotations could be verified to have no contradictions");
+            if ct {
+                self.check_termination(&verifier);
+            }
         } else {
-            println!("Contradiction to annotations found.")
-        }
-        if ct {
-            self.check_termination(&verifier);
+            println!("Correctness of annotations could not be verified.");
+            if ct {
+                println!(
+                    "As value annotations could not be verified, termination check is aborted."
+                )
+            }
         }
     }
 
     /// Verifies and propagates forward any known annotations
     pub fn verify_with_forward_propagation(&mut self, ct: bool) {
         let mut verifier = RuleVerifier::new();
+
+        let mut valid = true;
         for fact in self.program.facts() {
-            verifier.verify_facts(fact, self.program());
+            valid = verifier.verify_facts(fact, self.program()) && valid;
         }
 
         self.rule_graph.reset_scc_count();
@@ -111,19 +121,29 @@ impl AnnotationAnalyzer {
             }
         }
 
-        let mut valid = true;
-        for rule in self.program.rules() {
-            println!("Checking rule: {rule}");
-            valid = verifier.verify_with_restrictions(self.program(), &rule) && valid;
+        for (rule_index, rule) in self.program.rules().iter().enumerate() {
+            println!("Checking rule {rule_index}:");
+            if self
+                .program
+                .predicate_has_global_annotation(&rule.head()[0].predicate())
+            {
+                valid = verifier.verify_with_restrictions(self.program(), rule) && valid;
+            } else {
+                println!("\t Rule {rule_index} head predicate not annotated.");
+            }
         }
         if valid {
-            println!("Annotations could be verified to have no contradictions")
+            println!("Value annotations could be verified to have no contradictions");
+            if ct {
+                self.check_termination(&verifier);
+            }
         } else {
-            println!("Contradiction to annotations found.")
-        }
-
-        if ct {
-            self.check_termination(&verifier);
+            println!("Correctness of annotations could not be verified.");
+            if ct {
+                println!(
+                    "As value annotations could not be verified, termination check is aborted."
+                )
+            }
         }
     }
 

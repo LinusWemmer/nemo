@@ -14,7 +14,10 @@ use crate::{
         rule::NormalizedRule,
         termination_annotation::NormalizedTerminationAnnotation,
     },
-    rule_model::components::term::primitive::{Primitive, variable::Variable},
+    rule_model::components::{
+        tag::Tag,
+        term::primitive::{Primitive, variable::Variable},
+    },
 };
 
 /// Struct for translating rules to a z3 representation for verification
@@ -40,8 +43,7 @@ impl RuleTranslator {
         }
     }
 
-    /// Translates an operation into z3 ast according to tau
-    /// TODO: this need to be checked actually
+    /// Translates an operation into z3 ast
     /// #panics if the formula isn't well formed
     pub fn translate_operation(
         &self,
@@ -207,7 +209,39 @@ impl RuleTranslator {
             );
         }
 
-        // test if this is computationally feasible
+        let body_operations = rule
+            .operations()
+            .iter()
+            .map(|b| {
+                self.translate_operation(b, &var_cache)
+                    .as_bool()
+                    .expect("Top level operations should have Sort Bool")
+            })
+            .collect();
+
+        (body_operations, body_annotations)
+    }
+
+    /// Translate a (normalized) rule, only the annotations for edb annotations are translated
+    pub fn translate_rule_edb_annotations(
+        &self,
+        rule: &NormalizedRule,
+        var_cache: &HashMap<Variable, Int>,
+        program: &NormalizedProgram,
+        edb_predicates: &Vec<Tag>,
+    ) -> (Vec<Bool>, Vec<Bool>) {
+        let mut body_annotations = Vec::new();
+        for atom in rule.positive() {
+            if edb_predicates.contains(&atom.predicate()) {
+                body_annotations.extend(
+                    program
+                        .predicate_to_global_annotation(&atom.predicate())
+                        .iter()
+                        .map(|a| self.translate_body_assertion(a, atom, var_cache)),
+                );
+            }
+        }
+
         let body_operations = rule
             .operations()
             .iter()

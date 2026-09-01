@@ -17,7 +17,7 @@ pub struct NormalizedGlobalAnnotation {
     ///Headatom of the annotation
     head: BodyAtom,
 
-    /// Restrictions placed on the head atom, TODO
+    /// Restrictions placed on the head atom
     body: Vec<Operation>,
 }
 
