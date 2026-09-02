@@ -148,20 +148,20 @@ impl AnnotationAnalyzer {
     }
 
     /// Checks whether termination of the program can be verified
-    /// Move to own module
     pub fn check_termination(&mut self, rule_verifier: &RuleVerifier) -> bool {
         let edb_analyser = EdbAnalyzer::new(self.program(), self.rule_graph.clone());
         let restrictions = rule_verifier.predicate_restriction();
         let verifier =
             TerminationVerifier::new(edb_analyser, restrictions.clone(), self.program.clone());
         self.rule_graph.reset_scc_count();
+        println!("Checking termination...");
         while let Some(scc) = self.rule_graph.next_scc() {
             if scc.len() == 1 {
                 if !self.program.rules()[scc[0]].is_recursive() {
                     continue;
                 }
             }
-            println!("checking scc: {:?}", scc);
+            println!("Checking scc: {:?}", scc);
 
             verifier.check_scc_termination(&scc);
         }

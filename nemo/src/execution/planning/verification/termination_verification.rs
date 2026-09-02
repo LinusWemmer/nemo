@@ -13,6 +13,7 @@ use z3::{
 use crate::{
     execution::planning::{
         normalization::{
+            atom::body::BodyAtom,
             program::NormalizedProgram,
             rule::NormalizedRule,
             termination_annotation::{NormalizedTerminationAnnotation, TerminationDirection},
@@ -54,16 +55,34 @@ impl TerminationVerifier {
 
 impl TerminationVerifier {
     /// Constructs a map from nemo variables to z3 variables
-    pub fn build_var_cache(&self, rule: &NormalizedRule, i: usize) -> HashMap<Variable, Int> {
+    pub fn build_var_cache(&self, rule: &NormalizedRule, index: usize) -> HashMap<Variable, Int> {
         rule.variables()
             .map(|v| {
-                let name = format!("{}{i}", v.name().expect("Anon vars not supported yet"));
+                let name = format!("{}{index}", v.name().expect("Anon vars not supported yet"));
                 (v.clone(), Int::fresh_const(&name))
             })
             .collect()
     }
 
-    /// Prints a rule cycle, TODO: make pretty
+    /// Constructs a map from nemo variables to z3 variables
+    pub fn build_joint_var_cache(
+        &self,
+        rule: &NormalizedRule,
+        iteration: usize,
+        occurence_in_rule: usize,
+    ) -> HashMap<Variable, Int> {
+        rule.variables()
+            .map(|v| {
+                let name = format!(
+                    "{}{iteration}v{occurence_in_rule}",
+                    v.name().expect("Anon vars not supported yet")
+                );
+                (v.clone(), Int::fresh_const(&name))
+            })
+            .collect()
+    }
+
+    /// Prints a rule cycle
     pub fn print_cycle(cycle: &Vec<&NormalizedRule>) {
         print!("(");
         for rule in cycle {
@@ -78,15 +97,15 @@ impl TerminationVerifier {
     /// * The recursive predicate in the start of the cycle
     /// * The recursive vars at the end of the cycle
     /// TODO: restriction
-    /// TODO: incorporate joins if some predicate appears multiple times in body
     pub fn compose_cycle(
         &self,
         cycle: &Vec<&NormalizedRule>,
         annotation: &NormalizedTerminationAnnotation,
         incremental_predicate: &Tag,
-    ) -> (Vec<Bool>, Vec<Int>, Int, HashSet<Int>) {
+    ) -> (Vec<Bool>, Vec<Int>, Int, HashSet<Int>, bool) {
         let translator = RuleTranslator::new();
         let size = cycle.len();
+        let mut linear = true;
 
         let mut current_rule = cycle[0];
         let mut var_cache_previous: HashMap<Variable, Int> = self.build_var_cache(current_rule, 0);
@@ -101,8 +120,6 @@ impl TerminationVerifier {
                 translator.translate_termination_annotation_body(annotation, b, &var_cache_previous)
             })
             .collect();
-
-        //TODO: add back in support for restrictions
         let mut complete_rule_translation: Vec<Bool> = Vec::new();
 
         let (previous_rule_body, previous_rule_annotations) =
@@ -113,16 +130,19 @@ impl TerminationVerifier {
 
         for c_i in 1..size {
             current_rule = cycle[c_i];
-            let var_cache_current: HashMap<Variable, Int> = self.build_var_cache(current_rule, c_i);
 
-            let (current_rule_body, current_rule_annotations) =
-                translator.translate_rule(&current_rule, &var_cache_current, &self.program);
-            //TODO: joins have to be handled more carefully
-            for previous_head_occurence in current_rule
+            let previous_heads_in_body: Vec<&BodyAtom> = current_rule
                 .positive()
                 .iter()
                 .filter(|b| b.predicate() == previous_head.predicate())
-            {
+                .collect();
+            if previous_heads_in_body.len() == 1 {
+                let var_cache_current: HashMap<Variable, Int> =
+                    self.build_var_cache(current_rule, c_i);
+
+                let (current_rule_body, current_rule_annotations) =
+                    translator.translate_rule(&current_rule, &var_cache_current, &self.program);
+                let previous_head_occurence = previous_heads_in_body[0];
                 let substitution: Vec<(&Int, &Int)> = previous_head
                     .terms()
                     .zip(previous_head_occurence.terms())
@@ -155,6 +175,11 @@ impl TerminationVerifier {
 
                 var_cache_previous = var_cache_current.clone();
                 previous_head = &current_rule.head()[0];
+            } else {
+                println!(
+                    "Analyzed cycle is not linear for body atoms in cycle, termination cannot be checked."
+                );
+                linear = false;
             }
         }
 
@@ -171,13 +196,11 @@ impl TerminationVerifier {
             cycle_start_norm,
             cycle_end_norm,
             edb_vars,
+            linear,
         )
     }
 
-    // How to check bound vars:
-    // Each one that is bound in previous rule is bound
-    // it might be possible to do this with a boundedness check using z3?
-    /// Returns all bound vars for the rule
+    /// Returns all variables in the rule appearing in positions containing only values from the edb
     pub fn edb_vars_in_rule(
         &self,
         rule: &NormalizedRule,
@@ -304,16 +327,18 @@ impl TerminationVerifier {
         annotation: &NormalizedTerminationAnnotation,
         cycle_predicate: &Tag,
     ) -> bool {
-        let (composed_cycle, cycle_start_norm, cycle_end_norm, edb_vars) =
+        let (composed_cycle, cycle_start_norm, cycle_end_norm, edb_vars, linear) =
             self.compose_cycle(cycle, annotation, cycle_predicate);
+        if !linear {
+            return false;
+        }
         if self.strictly_changes_argument(
             &composed_cycle,
             &cycle_start_norm,
             &cycle_end_norm,
             annotation,
         ) {
-            println!("cycle strictly changes");
-            // Check bound TODO: incorporate bound by rules
+            //println!("cycle strictly changes");
             let has_bound = match annotation.direction() {
                 TerminationDirection::Decreasing => {
                     self.expression_has_lower_bound(&composed_cycle, &cycle_end_norm, &edb_vars)
@@ -342,7 +367,6 @@ impl TerminationVerifier {
             .map(|(index, _)| self.program.rules()[*index].head()[0].predicate())
             .collect();
         if intersect_preds.len() == 1 {
-            println!("spp!");
             Some(intersect_preds[0].clone())
         } else {
             None
@@ -354,7 +378,7 @@ impl TerminationVerifier {
         &self,
         rule_cycle: &Vec<&NormalizedRule>,
         cycle_predicate: &Tag,
-    ) -> bool {
+    ) -> Option<NormalizedTerminationAnnotation> {
         let cycle_len = rule_cycle.len();
         println!("{cycle_predicate}");
         if self
@@ -367,6 +391,7 @@ impl TerminationVerifier {
                 .filter(|(_, rule)| rule.head()[0].predicate() == *cycle_predicate)
                 .map(|(p, _)| p)
                 .collect();
+
             for start in potential_starts {
                 let permutated_cycle: Vec<&NormalizedRule> = rule_cycle
                     .iter()
@@ -384,18 +409,20 @@ impl TerminationVerifier {
                     cycle_predicate,
                 );
                 if terminates_by_annotation {
-                    print!("Termination for cycle ");
-                    TerminationVerifier::print_cycle(&permutated_cycle);
-                    println!("could be verified with annotation {annotation}.");
-                    return true;
+                    return Some(annotation.clone());
                 }
             }
+        } else {
+            println!("Termination annotation missing for predicate {cycle_predicate}.");
         }
-        false
+        None
     }
 
-    /// Check whether for any permutation of a cycle with a fitting annotation, termination can be proven
-    pub fn check_all_cycle_permutations(&self, rule_cycle: &Vec<&NormalizedRule>) -> bool {
+    /// Check whether for any permutation of a cycle with a fitting annotation termination can be proven
+    pub fn check_all_cycle_permutations(
+        &self,
+        rule_cycle: &Vec<&NormalizedRule>,
+    ) -> Option<NormalizedTerminationAnnotation> {
         let cycle_len = rule_cycle.len();
         let potential_starts: Vec<usize> = rule_cycle
             .iter()
@@ -426,14 +453,12 @@ impl TerminationVerifier {
                 .predicate_to_termination_annotation(cycle_predicate)[0];
             let terminates_by_annotation =
                 self.cycle_terminates_by_annotation(&permutated_cycle, annotation, cycle_predicate);
+
             if terminates_by_annotation {
-                print!("Termination for cycle ");
-                TerminationVerifier::print_cycle(&permutated_cycle);
-                println!("could be verified with annotation {annotation}.");
-                return true;
+                return Some(annotation.clone());
             }
         }
-        false
+        None
     }
 
     /// Checks all cycles for the scc
@@ -444,15 +469,13 @@ impl TerminationVerifier {
             return true;
         } else {
             println!("not weakly acyclic");
-            //TODO: implement property
             let cycles = propagation_graph.all_rule_cycles();
 
             //check single cycle dependency if there are multiple cycles in the scc
-            //TODO: what happens if this fails
             if cycles.len() > 1
                 && let Some(t_pred) = self.single_predicate_dependent(&cycles)
             {
-                println!("cycle predicate: {t_pred}");
+                println!("Cycle predicate: {t_pred}");
                 for cycle in cycles {
                     let rule_cycle: Vec<&NormalizedRule> = cycle
                         .iter()
@@ -462,12 +485,16 @@ impl TerminationVerifier {
                     let termination_proven =
                         self.check_cycle_termination_with_predicate(&rule_cycle, &t_pred);
 
-                    if !termination_proven {
-                        print!("Termination for cycle: ");
-                        TerminationVerifier::print_cycle(&rule_cycle);
-                        println!(
-                            "could not be verified. Consider adding annotations if you believe the cycle terminates"
-                        );
+                    if let Some(annotation) = termination_proven {
+                        print!("Termination for cycle: {:?}", cycle);
+                        //TerminationVerifier::print_cycle(&rule_cycle);
+                        println!(" could be verified with annotation {annotation}.");
+                        return false;
+                    } else {
+                        print!("Termination for cycle: {:?}", cycle);
+                        //TerminationVerifier::print_cycle(&rule_cycle);
+                        println!(" could not be verified.");
+                        return false;
                     }
                 }
             } else if cycles.len() == 1 {
@@ -478,14 +505,22 @@ impl TerminationVerifier {
                     .collect();
                 println!("checking cycle: {:?}", cycle);
                 let termination_proven = self.check_all_cycle_permutations(&rule_cycle);
-
-                if !termination_proven {
-                    print!("Termination for cycle: ");
-                    TerminationVerifier::print_cycle(&rule_cycle);
-                    println!(
-                        "could not be verified. Consider adding annotations if you believe the cycle terminates"
-                    );
+                if let Some(annotation) = termination_proven {
+                    print!("Termination for cycle: {:?}", cycle);
+                    //TerminationVerifier::print_cycle(&rule_cycle);
+                    println!(" could be verified with annotation {annotation}.");
+                    return false;
+                } else {
+                    print!("Termination for cycle: {:?}", cycle);
+                    //TerminationVerifier::print_cycle(&rule_cycle);
+                    println!(" could not be verified.");
+                    return false;
                 }
+            } else {
+                println!(
+                    "Cycle is not of the type where termination analysis is currently supported."
+                );
+                return false;
             }
             true
         }

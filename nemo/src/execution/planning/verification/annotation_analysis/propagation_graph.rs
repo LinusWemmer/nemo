@@ -51,27 +51,6 @@ impl PropagationGraph {
             .collect()
     }
 
-    /// Returns the sequence of rule applications for a given cycle
-    /// TODO: handle multi-edges and so on
-    /*pub fn edges_from_cycle(&self, cycle: &Vec<NodeIndex>) -> Vec<(usize, bool)> {
-        let mut cycle_edges = Vec::new();
-        let size = cycle.len();
-        for c_i in 0..size {
-            let c_j = (c_i + 1) % size;
-            let current_node = cycle[c_i];
-            let next_node = cycle[c_j];
-            if let Some(edge_index) = self.graph.find_edge(current_node, next_node) {
-                cycle_edges.push(
-                    self.graph
-                        .edge_weight(edge_index)
-                        .expect("edge should exist")
-                        .clone(),
-                );
-            }
-        }
-        cycle_edges
-    }*/
-
     /// Gets the set of all nodes that are positions of the same predicate
     pub fn same_predicate(&self, node: NodeIndex) -> HashSet<NodeIndex> {
         let predicate = self
@@ -190,7 +169,7 @@ impl PropagationGraph {
                 }
             }
         }
-        println!("{:?}", Dot::new(&rule_graph));
+        //println!("{:?}", Dot::new(&rule_graph));
         rule_graph
     }
 }
@@ -239,8 +218,6 @@ impl PropagationGraph {
 
                                     graph.add_edge(*node_body, *node_head, (rule_index, false));
                                 }
-                                //TODO: check if the critical var is actually bound by an edb expression, then it shouldn't be marked
-                                //TODO: actually only if not in other body atom
 
                                 for op in rule.operations() {
                                     if PropagationGraph::critical_operation(op) {

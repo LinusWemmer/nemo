@@ -16,7 +16,6 @@ use crate::{
 };
 
 /// Represents a restriction using z3 predicates very
-/// TODO: restriction are only allowed to be > or similar operations (syntactic check)
 #[derive(Debug, Clone)]
 pub struct Restriction {
     /// Variable names in restriction
@@ -136,7 +135,7 @@ impl Restriction {
 
         optimize.assert(&Bool::or(&self.restrictions));
         optimize.minimize(pos_var);
-        optimize.check(&[]); //TODO: might be necesarry to check what kind in order to avoid panic
+        optimize.check(&[]);
 
         match optimize.get_lower(0) {
             Some(a) => !a.to_string().contains("oo"),

@@ -105,9 +105,6 @@ impl ComponentBehavior for TerminationAnnotation {
             }
         }
 
-        // Check if all body are equality or unequality TODO: check for geq, gt, leq, lt
-        // TODO: check if body atom contains numeric terms ?
-
         report.result()
     }
 
