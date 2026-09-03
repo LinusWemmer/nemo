@@ -148,8 +148,9 @@ impl AnnotationAnalyzer {
     }
 
     /// Checks whether termination of the program can be verified
-    pub fn check_termination(&mut self, rule_verifier: &RuleVerifier) -> bool {
+    pub fn check_termination(&mut self, rule_verifier: &RuleVerifier) {
         let edb_analyser = EdbAnalyzer::new(self.program(), self.rule_graph.clone());
+        let mut valid = true;
         let restrictions = rule_verifier.predicate_restriction();
         let verifier =
             TerminationVerifier::new(edb_analyser, restrictions.clone(), self.program.clone());
@@ -163,8 +164,12 @@ impl AnnotationAnalyzer {
             }
             println!("Checking scc: {:?}", scc);
 
-            verifier.check_scc_termination(&scc);
+            valid = verifier.check_scc_termination(&scc) && valid;
         }
-        true
+        if valid {
+            println!("Termination for all components could be verified.");
+        } else {
+            println!("Failed to prove termination.");
+        }
     }
 }
